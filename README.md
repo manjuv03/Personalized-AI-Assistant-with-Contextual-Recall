@@ -17,13 +17,9 @@ Most chatbots forget you the moment a conversation ends, or they stuff the whole
 
 ```mermaid
 flowchart LR
-    U[User message] --> R[recall<br/>search Chroma DB]
-    R --> A[respond<br/>LLM with memories + summary]
-    A -->|thread too long| S[summarise<br/>fold old turns into summary]
-    A --> O[Reply]
-    S --> O
-    O -.background.-> X[extract facts] -.-> C[(Chroma DB<br/>long-term memory)]
-    C -.-> R
+    M[Message] --> R[Recall] --> A[Respond] --> O[Reply]
+    A -.-> S[Summarise]
+    O -.-> X[Save facts] -.-> C[(Chroma DB)] -.-> R
 ```
 
 There are two kinds of memory:

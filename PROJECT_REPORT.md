@@ -64,48 +64,19 @@ I wanted to understand how to build that properly: how to decide what's worth re
 ## 5. System architecture
 
 ```mermaid
-flowchart TB
-    subgraph Browser["Web UI (app/static/index.html)"]
-        Chat["Chat window"]
-        Panels["Side panel: Recalled · Memories · Map · Logs"]
-    end
-
-    subgraph API["FastAPI (app/api.py)"]
-        ChatEP["POST /chat"]
-        MemEP["/users/{id}/memories, /memory-map"]
-        LogEP["/users/{id}/logs"]
-        BG["Background task: save new facts"]
-    end
-
-    subgraph Core["Assistant (app/service.py)"]
-        Graph["LangGraph agent (app/graph.py)"]
-        Extract["Fact extractor (memory/extractor.py)"]
-    end
-
-    subgraph Stores["Storage"]
-        Chroma[("Chroma DB<br/>long-term memory")]
-        Ckpt[("LangGraph checkpointer<br/>per-thread messages + summary")]
-        SQL[("SQLite<br/>interaction log")]
-    end
-
-    LLM["Chat model<br/>Gemini / OpenAI / Ollama<br/>(wrapped with retries)"]
-    Emb["Embedding model<br/>all-MiniLM-L6-v2"]
-
-    Chat --> ChatEP
-    Panels --> MemEP
-    Panels --> LogEP
-    ChatEP --> Graph
-    ChatEP --> BG --> Extract
-    Graph --> Chroma
-    Graph --> Ckpt
-    Graph --> LLM
-    Extract --> LLM
-    Extract --> Chroma
-    Chroma --- Emb
-    ChatEP --> SQL
-    MemEP --> Chroma
-    LogEP --> SQL
+flowchart LR
+    UI[Web UI] --> API[FastAPI]
+    API --> G[LangGraph agent]
+    API -.-> E[Fact extractor]
+    G --> LLM[Chat model]
+    E --> LLM
+    G <--> C[(Chroma DB)]
+    E --> C
+    G <--> K[(Thread state)]
+    API --> L[(SQLite logs)]
 ```
+
+The dashed line runs in the background after the reply is sent. Every model call goes through a retry wrapper, and Chroma DB uses local all-MiniLM-L6-v2 embeddings.
 
 ### Code layout
 
@@ -134,55 +105,36 @@ tests/                Offline unit and end-to-end tests
 ### 6.1 The flow
 
 ```mermaid
-flowchart TD
-    A([User sends a message]) --> B["POST /chat<br/>user_id, thread_id, message"]
-    B --> C["LangGraph: load this thread's<br/>messages and summary"]
-    C --> D{"Memory switched on?"}
-    D -- yes --> E["recall: embed the message,<br/>search Chroma for this user"]
-    E --> F["Re-rank hits by<br/>similarity, importance, recency;<br/>keep top 5 above threshold"]
-    D -- no --> G
-    F --> G["respond: build prompt =<br/>system rules + remembered facts<br/>+ summary + recent messages"]
-    G --> H["Call chat model<br/>(retries if busy)"]
-    H --> I{"More than 8 messages<br/>in this thread?"}
-    I -- yes --> J["summarise: fold older messages<br/>into the running summary,<br/>remove them from state"]
-    I -- no --> K
-    J --> K["Return reply, recalled memories<br/>and latency to the browser"]
-    K --> L["Log the turn in SQLite"]
-    K --> M["Background: extract facts<br/>from the user's message"]
-    M --> N{"Each fact: near-duplicate<br/>of an existing memory?"}
-    N -- "yes, cosine ≥ 0.92" --> O["Update the old memory<br/>with the new wording"]
-    N -- no --> P["Add a new memory"]
-    O --> Q[("Chroma DB")]
-    P --> Q
+flowchart LR
+    A[Message] --> C{Memory on?}
+    C -- yes --> D[Recall + rank] --> E[Respond]
+    C -- no --> E
+    E --> F{"Over 8 msgs?"}
+    F -- yes --> G[Summarise] --> H[Reply]
+    F -- no --> H
+    H -.-> I[Extract facts] --> J{Duplicate?}
+    J -- yes --> K[Update] --> DB[(Chroma)]
+    J -- no --> L[Add] --> DB
 ```
+
+Recall embeds the message, searches Chroma DB for this user and keeps the top 5 after re-ranking (section 7.3). The reply prompt holds the system rules, those facts, the running summary and the recent messages. Dashed steps run in the background.
 
 ### 6.2 The same flow over time
 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant API as FastAPI
-    participant G as LangGraph
+    participant A as App
     participant C as Chroma DB
-    participant M as Chat model
-
-    U->>API: "Hi, I'm Manju, doing an MSc at Queen Mary" (thread main)
-    API->>G: invoke
-    G->>C: recall (nothing yet)
-    G->>M: prompt
-    M-->>G: reply
-    API-->>U: reply
-    API->>M: (background) extract facts
-    M-->>API: ["The user's name is Manju", "The user is doing an MSc ..."]
-    API->>C: store facts
-
-    U->>API: "What am I studying?" (thread new)
-    API->>G: invoke (fresh thread, no history)
-    G->>C: recall "What am I studying?"
-    C-->>G: "The user is doing an MSc in Data Science at Queen Mary"
-    G->>M: prompt + remembered fact
-    M-->>G: "You're doing an MSc in Data Science at Queen Mary"
-    API-->>U: reply + the memory it used
+    participant M as Model
+    U->>A: I'm Manju, MSc at Queen Mary (thread main)
+    A->>M: reply
+    A->>C: save facts (background)
+    U->>A: What am I studying? (thread new)
+    A->>C: recall
+    C-->>A: MSc at Queen Mary
+    A->>M: question + fact
+    A-->>U: You're doing an MSc at Queen Mary
 ```
 
 ---
@@ -236,12 +188,10 @@ The weather remark is slightly closer in meaning, but the name wins because it m
 
 ```mermaid
 flowchart LR
-    A["Thread has 10 messages"] --> B{"More than<br/>KEEP_RECENT_MESSAGES (8)?"}
-    B -- no --> C["Keep all"]
-    B -- yes --> D["Oldest 2 messages"]
-    B -- yes --> E["Newest 8 messages<br/>kept word for word"]
-    D --> F["Model updates the<br/>running summary"]
-    F --> G["Old messages removed<br/>from the thread"]
+    A[10 messages] --> B{"Over 8?"}
+    B -- no --> F[Keep all]
+    B -- yes --> C[Oldest 2] --> D[Update summary]
+    B -- yes --> E[Newest 8 kept]
 ```
 
 The prompt then holds the summary plus the last 8 messages, whatever the length of the conversation. Long-term facts don't depend on this, because they live in Chroma.
@@ -255,17 +205,17 @@ The prompt then holds the summary plus the last 8 messages, whatever the length 
 While testing on Gemini's free tier, I hit "503: this model is currently experiencing high demand". Every model call now goes through a retry wrapper:
 
 ```mermaid
-flowchart TD
-    A["Call the model"] --> B{"Error?"}
-    B -- no --> Z([Return reply])
-    B -- yes --> C{"Temporary problem?<br/>503, 429, quota, timeout,<br/>dropped connection"}
-    C -- "no, e.g. bad key" --> X([Fail straight away<br/>with the real error])
-    C -- yes --> D{"Retries left?<br/>(default 4)"}
-    D -- yes --> E["Wait 1.5 s, 3 s, 6 s, 12 s...<br/>with a little random jitter"] --> A
-    D -- no --> Y(["Return 503:<br/>'The model is busy right now'"])
+flowchart LR
+    A[Call model] --> B{Error?}
+    B -- no --> Z([Reply])
+    B -- yes --> C{Temporary?}
+    C -- no --> X([Fail now])
+    C -- yes --> D{Retries left?}
+    D -- yes --> W[Wait, back off] --> A
+    D -- no --> Y(["Model busy"])
 ```
 
-The UI shows that message rather than a generic server error. The evaluation skips and counts busy probes instead of crashing.
+"Temporary" means a 503, 429, quota error, timeout or dropped connection; anything else, like a bad key, fails straight away. Waits grow 1.5 s, 3 s, 6 s, 12 s, with a little random jitter, for up to 4 retries. After that the API returns "The model is busy right now", and the UI shows that message rather than a generic server error. The evaluation skips and counts busy probes instead of crashing.
 
 ### 8.2 Response time
 
@@ -324,19 +274,13 @@ The tests run offline. They use an in-memory vector store, hashing embeddings an
 ## 11. Evaluation method
 
 ```mermaid
-flowchart TD
-    A["8 personas in eval/scenarios.json<br/>e.g. Priya: nurse, vegetarian, half marathon"] --> B["Thread 'teach': tell the assistant<br/>each persona's facts; save memories"]
-    B --> C["For each probe question<br/>e.g. 'Suggest a quick dinner'"]
-    C --> D["Thread 'probe' (new, no history)<br/>ask with memory ON"]
-    C --> E["Thread 'baseline' (new, no history)<br/>ask with memory OFF"]
-    D --> F{"Reply contains an<br/>expected keyword?"}
-    E --> G{"Reply contains an<br/>expected keyword?"}
-    F --> H["Continuity with memory"]
-    G --> I["Continuity without memory"]
-    D --> J["Latency: recall step,<br/>full turn"]
-    H --> K["eval/results.md"]
-    I --> K
-    J --> K
+flowchart LR
+    A[8 personas] --> B[Teach facts] --> C[Ask in new thread]
+    C --> D[Memory on]
+    C --> E[Memory off]
+    D --> F[Score + time]
+    E --> F
+    F --> G[results.md]
 ```
 
 - **Continuity** is the share of probe questions answered correctly using facts from an earlier conversation. Each probe runs in a brand-new thread, so the conversation history can't help; only long-term memory can.
