@@ -2,7 +2,6 @@ name: tests
 
 on:
   push:
-    branches: [main]
   pull_request:
 
 jobs:
@@ -18,5 +17,5 @@ jobs:
           python-version: ${{ matrix.python-version }}
       # The tests use an in-memory vector store, hashing embeddings and a scripted
       # model, so only the lightweight core packages are needed here.
-      - run: pip install "langchain-core>=0.3" "langgraph>=0.4" "numpy>=1.26" "pytest>=8.0"
+      - run: pip install "langchain-core>=0.3" "langgraph>=0.4" "langgraph-checkpoint-sqlite>=2.0" "numpy>=1.26" "pytest>=8.0"
       - run: python -m pytest -q

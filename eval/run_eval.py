@@ -32,7 +32,7 @@ HERE = Path(__file__).parent
 
 def run(runs: int, scenario_path: Path, delay: float = 0.0) -> dict:
     scenarios = json.loads(scenario_path.read_text(encoding="utf-8"))
-    eval_settings = replace(settings, chroma_collection=f"{settings.chroma_collection}_eval")
+    eval_settings = replace(settings, chroma_collection=f"{settings.chroma_collection}_eval", checkpoint_path=":memory:")
     assistant = Assistant(eval_settings, log=InteractionLog(":memory:"))
 
     cases = []

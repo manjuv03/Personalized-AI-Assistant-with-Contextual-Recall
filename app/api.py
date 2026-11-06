@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import threading
 from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
 
 from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -62,12 +64,23 @@ class ChatResponse(BaseModel):
     recalled: list[dict]
     latency_ms: float
     log_id: int
+    tools: list[dict] = []
 
 
 class MemoryIn(BaseModel):
     text: str = Field(min_length=3, max_length=500)
     category: str = "other"
     importance: float = Field(default=0.6, ge=0, le=1)
+
+
+class MemoryPatch(BaseModel):
+    text: str | None = Field(default=None, min_length=3, max_length=500)
+    category: str | None = None
+    importance: float | None = Field(default=None, ge=0, le=1)
+
+
+def _memory_json(m) -> dict:
+    return {"id": m.id, "text": m.text, "category": m.category, "importance": m.importance, "updated_at": m.updated_at}
 
 
 @app.get("/", include_in_schema=False)
@@ -87,22 +100,55 @@ def chat(req: ChatRequest, background: BackgroundTasks, assistant: Assistant = D
         # Saving new facts happens after the reply is sent.
         background.add_task(assistant.remember_safely, req.user_id, req.message, result.log_id)
     return ChatResponse(
-        reply=result.reply, recalled=result.recalled, latency_ms=round(result.latency_ms, 1), log_id=result.log_id
+        reply=result.reply,
+        recalled=result.recalled,
+        latency_ms=round(result.latency_ms, 1),
+        log_id=result.log_id,
+        tools=result.tools,
     )
+
+
+@app.post("/chat/stream")
+def chat_stream(req: ChatRequest, assistant: Assistant = Depends(get_assistant)) -> StreamingResponse:
+    """Server-Sent Events: recalled, token, tools, then done (or error)."""
+
+    def events():
+        try:
+            for event in assistant.chat_stream(req.user_id, req.thread_id, req.message, use_memory=req.use_memory):
+                if event["type"] == "done" and req.use_memory:
+                    threading.Thread(
+                        target=assistant.remember_safely,
+                        args=(req.user_id, req.message, event["log_id"]),
+                        daemon=True,
+                    ).start()
+                yield f"event: {event['type']}\ndata: {json.dumps(event)}\n\n"
+        except ModelBusyError as exc:
+            yield f"event: error\ndata: {json.dumps({'type': 'error', 'detail': str(exc)})}\n\n"
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Streaming failed")
+            detail = f"{type(exc).__name__}: {exc}"[:300]
+            yield f"event: error\ndata: {json.dumps({'type': 'error', 'detail': detail})}\n\n"
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
 
 @app.get("/users/{user_id}/memories")
 def list_memories(user_id: str, assistant: Assistant = Depends(get_assistant)) -> list[dict]:
-    return [
-        {"id": m.id, "text": m.text, "category": m.category, "importance": m.importance, "updated_at": m.updated_at}
-        for m in assistant.memory.list(user_id)
-    ]
+    return [_memory_json(m) for m in assistant.memory.list(user_id)]
 
 
 @app.post("/users/{user_id}/memories")
 def add_memory(user_id: str, body: MemoryIn, assistant: Assistant = Depends(get_assistant)) -> dict:
     rec = assistant.memory.add(user_id, body.text, body.category, body.importance)
     return {"id": rec.id, "text": rec.text, "category": rec.category}
+
+
+@app.patch("/users/{user_id}/memories/{memory_id}")
+def edit_memory(user_id: str, memory_id: str, body: MemoryPatch, assistant: Assistant = Depends(get_assistant)) -> dict:
+    rec = assistant.memory.update(user_id, memory_id, body.text, body.category, body.importance)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="Memory not found")
+    return _memory_json(rec)
 
 
 @app.delete("/users/{user_id}/memories/{memory_id}")
@@ -115,6 +161,23 @@ def delete_memory(user_id: str, memory_id: str, assistant: Assistant = Depends(g
 @app.get("/users/{user_id}/memory-map")
 def memory_map(user_id: str, assistant: Assistant = Depends(get_assistant)) -> list[dict]:
     return assistant.memory.projection(user_id)
+
+
+@app.get("/users/{user_id}/threads")
+def list_threads(user_id: str, assistant: Assistant = Depends(get_assistant)) -> list[dict]:
+    return assistant.threads(user_id)
+
+
+@app.get("/users/{user_id}/threads/{thread_id}/messages")
+def thread_messages(user_id: str, thread_id: str, assistant: Assistant = Depends(get_assistant)) -> list[dict]:
+    return assistant.thread_history(user_id, thread_id)
+
+
+@app.delete("/users/{user_id}/threads/{thread_id}")
+def delete_thread(user_id: str, thread_id: str, assistant: Assistant = Depends(get_assistant)) -> dict:
+    if not assistant.delete_thread(user_id, thread_id):
+        raise HTTPException(status_code=404, detail="Chat not found")
+    return {"deleted": thread_id}
 
 
 @app.get("/users/{user_id}/threads/{thread_id}/summary")

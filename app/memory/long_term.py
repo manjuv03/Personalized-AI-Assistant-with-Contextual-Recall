@@ -76,6 +76,7 @@ def rank_score(similarity: float, importance: float, updated_at: float, now: flo
 
 class VectorBackend(Protocol):
     def upsert(self, record: MemoryRecord, embedding: list[float]) -> None: ...
+    def get(self, user_id: str, memory_id: str) -> tuple[MemoryRecord, list[float]] | None: ...
     def query(self, user_id: str, embedding: list[float], k: int) -> list[tuple[MemoryRecord, float]]: ...
     def list(self, user_id: str) -> list[tuple[MemoryRecord, list[float]]]: ...
     def delete(self, user_id: str, memory_id: str) -> bool: ...
@@ -96,6 +97,10 @@ class InMemoryBackend:
 
     def upsert(self, record: MemoryRecord, embedding: list[float]) -> None:
         self._rows[record.id] = (record, embedding)
+
+    def get(self, user_id: str, memory_id: str) -> tuple[MemoryRecord, list[float]] | None:
+        row = self._rows.get(memory_id)
+        return row if row and row[0].user_id == user_id else None
 
     def query(self, user_id: str, embedding: list[float], k: int) -> list[tuple[MemoryRecord, float]]:
         hits = [
@@ -146,6 +151,14 @@ class ChromaBackend:
             embeddings=[embedding],
             metadatas=[record.metadata()],
         )
+
+    def get(self, user_id: str, memory_id: str) -> tuple[MemoryRecord, list[float]] | None:
+        res = self._col.get(ids=[memory_id], include=["documents", "metadatas", "embeddings"])
+        if not res["ids"] or res["metadatas"][0].get("user_id") != user_id:
+            return None
+        embeddings = res.get("embeddings")
+        embedding = list(embeddings[0]) if embeddings is not None and len(embeddings) else []
+        return self._record(res["ids"][0], res["documents"][0], res["metadatas"][0]), embedding
 
     def query(self, user_id: str, embedding: list[float], k: int) -> list[tuple[MemoryRecord, float]]:
         if self._col.count() == 0:
@@ -238,6 +251,32 @@ class LongTermMemory:
         ranked = [r for r in ranked if r.score >= self.min_score]
         ranked.sort(key=lambda r: r.score, reverse=True)
         return ranked[:k]
+
+    def update(
+        self,
+        user_id: str,
+        memory_id: str,
+        text: str | None = None,
+        category: str | None = None,
+        importance: float | None = None,
+    ) -> MemoryRecord | None:
+        """Edit a memory by hand. Changing the text re-embeds it."""
+        row = self.backend.get(user_id, memory_id)
+        if row is None:
+            return None
+        record, embedding = row
+        if text is not None and text.strip() and text.strip() != record.text:
+            record.text = text.strip()
+            embedding = self.embedder.embed_query(record.text)
+        if category is not None:
+            record.category = category if category in CATEGORIES else "other"
+        if importance is not None:
+            record.importance = max(0.0, min(1.0, float(importance)))
+        if not embedding:
+            embedding = self.embedder.embed_query(record.text)
+        record.updated_at = time.time()
+        self.backend.upsert(record, embedding)
+        return record
 
     def list(self, user_id: str) -> list[MemoryRecord]:
         records = [rec for rec, _ in self.backend.list(user_id)]

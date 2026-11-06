@@ -65,6 +65,14 @@ class Settings:
     # fold anything older into a running summary.
     keep_recent_messages: int = field(default_factory=lambda: int(_env("KEEP_RECENT_MESSAGES", "8")))
 
+    # Memory tools: let the assistant search, save and forget memories itself.
+    agent_tools: bool = field(default_factory=lambda: _env("AGENT_TOOLS", "true").lower() in ("1", "true", "yes", "on"))
+    max_tool_rounds: int = field(default_factory=lambda: int(_env("MAX_TOOL_ROUNDS", "3")))
+
+    # Saved chats: LangGraph checkpoints in SQLite, so conversations survive restarts.
+    # Set to ":memory:" to keep them in memory only.
+    checkpoint_path: str = field(default_factory=lambda: _env("CHECKPOINT_PATH", "data/threads.sqlite"))
+
     # Interaction logs.
     log_db_path: str = field(default_factory=lambda: _env("LOG_DB_PATH", "data/interactions.sqlite"))
 

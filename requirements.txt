@@ -1,6 +1,7 @@
 # Core
 langchain-core>=0.3
 langgraph>=0.4
+langgraph-checkpoint-sqlite>=2.0
 chromadb>=0.5
 numpy>=1.26
 fastapi>=0.115

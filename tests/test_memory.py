@@ -1,5 +1,7 @@
 import time
 
+import pytest
+
 from app.llm import HashEmbeddings
 from app.logs import InteractionLog
 from app.memory.extractor import parse_extracted_facts
@@ -127,3 +129,62 @@ def test_message_text_handles_content_blocks():
 
     assert message_text(Msg()) == "Hi Manju!"
     assert message_text("plain") == "plain"
+
+
+# --- editing memories, tools and chats --------------------------------------
+
+def test_update_changes_text_category_and_importance():
+    mem = make_memory(min_score=0.0)
+    rec = mem.add("u1", "The user lives in Leeds.", "profile", 0.5)
+    updated = mem.update("u1", rec.id, text="The user lives in London.", category="profile", importance=0.9)
+    assert updated.text == "The user lives in London." and updated.importance == 0.9
+    assert mem.recall("u1", "where do I live London")[0].record.text == "The user lives in London."
+    assert mem.update("u2", rec.id, text="hijack") is None
+
+
+def test_tools_save_search_and_forget():
+    pytest.importorskip("langchain_core")
+    from app.memory.tools import run_tool
+
+    mem = make_memory(min_score=0.0)
+    out, event = run_tool(mem, "u1", "save_memory", {"text": "The user's sister is called Asha.", "category": "profile"})
+    assert event["label"].startswith("Saved") and len(mem.list("u1")) == 1
+    out, event = run_tool(mem, "u1", "search_memory", {"query": "sister"})
+    memory_id = mem.list("u1")[0].id
+    assert memory_id in out
+    out, event = run_tool(mem, "u2", "forget_memory", {"memory_id": memory_id})
+    assert "failed" in event["label"] and len(mem.list("u1")) == 1  # other users can't delete it
+    out, event = run_tool(mem, "u1", "forget_memory", {"memory_id": f"[{memory_id}]"})
+    assert event["label"].startswith("Forgot") and mem.list("u1") == []
+
+
+def test_split_never_starts_with_a_tool_result():
+    msgs = ["H", "A", "H", "A", "T", "T", "A", "H", "A", "H"]
+    old, recent = split_for_summary(msgs, keep_recent=4, is_start=lambda m: m == "H")
+    assert recent[0] == "H" and old + recent == msgs
+
+
+def test_log_lists_threads_and_migrates_old_tables(tmp_path):
+    import sqlite3
+
+    path = tmp_path / "old.sqlite"
+    con = sqlite3.connect(path)
+    con.execute(
+        "CREATE TABLE interactions (id INTEGER PRIMARY KEY AUTOINCREMENT, ts REAL NOT NULL, user_id TEXT NOT NULL,"
+        " thread_id TEXT NOT NULL, user_message TEXT NOT NULL, reply TEXT NOT NULL, recalled TEXT NOT NULL,"
+        " stored TEXT NOT NULL DEFAULT '[]', latency_ms REAL NOT NULL)"
+    )
+    con.execute("INSERT INTO interactions (ts, user_id, thread_id, user_message, reply, recalled, latency_ms)"
+                " VALUES (1, 'u1', 'old', 'Hello from before', 'Hi', '[]', 900)")
+    con.commit()
+    con.close()
+
+    log = InteractionLog(str(path))
+    log.add("u1", "new", "A new chat", "Sure", [], 500, tools=[{"name": "save_memory", "label": "Saved"}], first_token_ms=120)
+    threads = log.threads("u1")
+    assert [t["thread_id"] for t in threads] == ["new", "old"]
+    assert threads[1]["title"] == "Hello from before"
+    turn = log.thread_turns("u1", "new")[0]
+    assert turn["tools"][0]["name"] == "save_memory" and turn["first_token_ms"] == 120
+    assert log.thread_turns("u1", "old")[0]["tools"] == []
+    assert log.delete_thread("u1", "old") == 1

@@ -79,5 +79,15 @@ class RetryingChatModel:
                 log.warning("Model busy (%s). Retry %d/%d in %.1fs", type(error).__name__, attempt, self.max_retries, delay)
                 self._sleep(delay)
 
+    def bind_tools(self, tools, **kwargs) -> "RetryingChatModel":
+        """Bind tools to the wrapped model and keep the retries."""
+        return RetryingChatModel(
+            self.model.bind_tools(tools, **kwargs),
+            max_retries=self.max_retries,
+            base_delay=self.base_delay,
+            max_delay=self.max_delay,
+            sleep=self._sleep,
+        )
+
     def __getattr__(self, name):
         return getattr(self.model, name)
