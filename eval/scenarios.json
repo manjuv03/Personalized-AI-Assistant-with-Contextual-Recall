@@ -1,0 +1,220 @@
+[
+  {
+    "persona": "priya",
+    "teach": [
+      "Hi! I'm Priya, I work as a nurse in Leeds.",
+      "I'm vegetarian, so please never suggest meat recipes.",
+      "I'm training for my first half marathon in April."
+    ],
+    "probes": [
+      {
+        "question": "What's my name?",
+        "expect": [
+          "priya"
+        ]
+      },
+      {
+        "question": "Suggest a quick dinner I could make tonight.",
+        "expect": [
+          "vegetarian",
+          "veggie",
+          "tofu",
+          "lentil*",
+          "chickpea*",
+          "paneer",
+          "bean*"
+        ]
+      },
+      {
+        "question": "What race am I training for?",
+        "expect": [
+          "half marathon",
+          "half-marathon"
+        ]
+      }
+    ]
+  },
+  {
+    "persona": "tom",
+    "teach": [
+      "My name is Tom and I'm a second-year physics student.",
+      "I prefer short answers with bullet points.",
+      "I'm building a Raspberry Pi weather station for a side project."
+    ],
+    "probes": [
+      {
+        "question": "What do I study?",
+        "expect": [
+          "physics"
+        ]
+      },
+      {
+        "question": "Remind me what my side project is.",
+        "expect": [
+          "weather station",
+          "raspberry pi"
+        ]
+      }
+    ]
+  },
+  {
+    "persona": "aisha",
+    "teach": [
+      "I'm Aisha. I'm learning Spanish because I'm moving to Madrid next year.",
+      "I have a cat called Biscuit.",
+      "I'm allergic to peanuts."
+    ],
+    "probes": [
+      {
+        "question": "Which city am I moving to?",
+        "expect": [
+          "madrid"
+        ]
+      },
+      {
+        "question": "What's my pet's name?",
+        "expect": [
+          "biscuit"
+        ]
+      },
+      {
+        "question": "Is a satay sauce a good idea for me?",
+        "expect": [
+          "peanut",
+          "allerg*"
+        ]
+      }
+    ]
+  },
+  {
+    "persona": "rahul",
+    "teach": [
+      "I'm Rahul, a backend developer. I mostly write Go.",
+      "My goal this year is to get the AWS Solutions Architect certification.",
+      "I live in Bengaluru."
+    ],
+    "probes": [
+      {
+        "question": "Which programming language do I use most?",
+        "expect": [
+          "go",
+          "golang"
+        ]
+      },
+      {
+        "question": "What certification am I working towards?",
+        "expect": [
+          "aws",
+          "solutions architect"
+        ]
+      },
+      {
+        "question": "Where do I live?",
+        "expect": [
+          "bengaluru",
+          "bangalore"
+        ]
+      }
+    ]
+  },
+  {
+    "persona": "emma",
+    "teach": [
+      "Hello, I'm Emma and I teach primary school in Bristol.",
+      "I love hiking in the Lake District at weekends.",
+      "Please keep explanations simple, I'm not technical."
+    ],
+    "probes": [
+      {
+        "question": "What's my job?",
+        "expect": [
+          "teach*"
+        ]
+      },
+      {
+        "question": "Where do I like to go hiking?",
+        "expect": [
+          "lake district"
+        ]
+      }
+    ]
+  },
+  {
+    "persona": "kenji",
+    "teach": [
+      "I'm Kenji. I run a small coffee shop called Ember.",
+      "I'm trying to cut down on sugar.",
+      "Actually, my coffee shop is called Ember & Oak now, we renamed it."
+    ],
+    "probes": [
+      {
+        "question": "What's the name of my coffee shop?",
+        "expect": [
+          "ember & oak",
+          "ember and oak"
+        ]
+      },
+      {
+        "question": "Recommend a snack for me.",
+        "expect": [
+          "sugar",
+          "unsweetened",
+          "nut*",
+          "low-sugar",
+          "low sugar"
+        ]
+      }
+    ]
+  },
+  {
+    "persona": "sofia",
+    "teach": [
+      "My name is Sofia and I'm writing a fantasy novel about a lighthouse keeper.",
+      "My favourite author is Ursula K. Le Guin.",
+      "I write best early in the morning."
+    ],
+    "probes": [
+      {
+        "question": "What is my novel about?",
+        "expect": [
+          "lighthouse"
+        ]
+      },
+      {
+        "question": "Who's my favourite author?",
+        "expect": [
+          "le guin"
+        ]
+      },
+      {
+        "question": "When do I do my best writing?",
+        "expect": [
+          "morning"
+        ]
+      }
+    ]
+  },
+  {
+    "persona": "daniel",
+    "teach": [
+      "I'm Daniel, I'm a data analyst at a bank.",
+      "I use Power BI every day and want to learn Python properly.",
+      "I have two kids, Mia and Leo."
+    ],
+    "probes": [
+      {
+        "question": "What tool do I use daily at work?",
+        "expect": [
+          "power bi"
+        ]
+      },
+      {
+        "question": "What are my children called?",
+        "expect": [
+          "mia",
+          "leo"
+        ]
+      }
+    ]
+  }
+]

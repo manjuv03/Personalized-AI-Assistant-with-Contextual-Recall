@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Contextual Recall Assistant</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1d1b; --muted: #6b6a65; --line: #e3e1da;
+    --accent: #2f6f5e; --accent-soft: #e3efe9; --user: #1d1d1b; --user-ink: #ffffff;
+    --cat-profile: #2f6f5e; --cat-preference: #b5651d; --cat-goal: #3c5a99; --cat-project: #8a3b74; --cat-other: #6b6a65;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151514; --panel: #1e1e1c; --ink: #ecebe6; --muted: #9c9b95; --line: #33332f;
+      --accent: #6cc2a6; --accent-soft: #23332d; --user: #ecebe6; --user-ink: #151514;
+      --cat-profile: #6cc2a6; --cat-preference: #e0a060; --cat-goal: #8aa8e8; --cat-project: #d08cc0; --cat-other: #9c9b95;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; padding: 14px 20px; border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 17px; margin: 0; font-weight: 650; }
+  header .ids { display: flex; gap: 8px; align-items: center; color: var(--muted); font-size: 13px; }
+  header input { width: 110px; padding: 5px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--ink); }
+  label.toggle { display: flex; gap: 6px; align-items: center; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; height: calc(100vh - 60px); }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; height: auto; } #side { border-left: 0; border-top: 1px solid var(--line); } }
+  #chat { display: flex; flex-direction: column; min-height: 60vh; }
+  #messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+  .msg { max-width: 75%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; }
+  .msg.user { align-self: flex-end; background: var(--user); color: var(--user-ink); border-bottom-right-radius: 4px; }
+  .msg.ai { align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .meta button { background: none; border: 0; color: var(--accent); cursor: pointer; padding: 0; font: inherit; }
+  form { display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--line); }
+  form textarea { flex: 1; resize: none; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--ink); font: inherit; }
+  form button { padding: 0 18px; border: 0; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 600; cursor: pointer; }
+  form button:disabled { opacity: .5; }
+  #side { border-left: 1px solid var(--line); background: var(--panel); display: flex; flex-direction: column; min-height: 0; }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tabs button { flex: 1; padding: 11px 0; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); cursor: pointer; font: inherit; }
+  .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
+  .pane { display: none; padding: 16px; overflow-y: auto; flex: 1; }
+  .pane.active { display: block; }
+  .pane h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .card { border: 1px solid var(--line); border-radius: 10px; padding: 9px 11px; margin-bottom: 8px; }
+  .card .row { display: flex; justify-content: space-between; gap: 8px; align-items: flex-start; }
+  .tag { font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; color: #fff; white-space: nowrap; }
+  .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+  .bar span { display: block; height: 100%; background: var(--accent); }
+  .del { background: none; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; }
+  .empty { color: var(--muted); font-size: 14px; }
+  canvas { width: 100%; height: 300px; border: 1px solid var(--line); border-radius: 10px; }
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+  .stat { display: flex; gap: 18px; margin-bottom: 12px; }
+  .stat b { display: block; font-size: 20px; }
+  .stat span { font-size: 12px; color: var(--muted); }
+  #hover { font-size: 13px; min-height: 20px; margin-top: 8px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Contextual Recall Assistant</h1>
+  <div class="ids">
+    user <input id="userId" value="demo">
+    thread <input id="threadId" value="main">
+    <label class="toggle"><input type="checkbox" id="useMemory" checked> memory</label>
+  </div>
+</header>
+<main>
+  <section id="chat">
+    <div id="messages"><p class="empty">Tell the assistant something about yourself, then start a new thread and see what it remembers.</p></div>
+    <form id="form">
+      <textarea id="input" rows="2" placeholder="Message…" required></textarea>
+      <button id="send">Send</button>
+    </form>
+  </section>
+  <aside id="side">
+    <div class="tabs">
+      <button data-tab="recall" class="active">Recalled</button>
+      <button data-tab="memories">Memories</button>
+      <button data-tab="map">Map</button>
+      <button data-tab="logs">Logs</button>
+    </div>
+    <div class="pane active" id="pane-recall"><h2>Used for the last reply</h2><div id="recallList" class="empty">Nothing yet.</div></div>
+    <div class="pane" id="pane-memories"><h2>Everything remembered</h2><div id="memList"></div></div>
+    <div class="pane" id="pane-map">
+      <h2>Memory map (PCA of embeddings)</h2>
+      <canvas id="map"></canvas>
+      <div id="hover" class="empty">Hover a point to see the memory.</div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="pane" id="pane-logs"><h2>Interaction log</h2><div id="logStats" class="stat"></div><div id="logList"></div></div>
+  </aside>
+</main>
+<script>
+const $ = (id) => document.getElementById(id);
+const CATS = ["profile", "preference", "goal", "project", "other"];
+const catColor = (c) => getComputedStyle(document.documentElement).getPropertyValue(`--cat-${CATS.includes(c) ? c : "other"}`).trim();
+const user = () => encodeURIComponent($("userId").value.trim() || "demo");
+let mapPoints = [];
+
+function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+function addMessage(role, text, data) {
+  const box = $("messages");
+  box.querySelector(".empty")?.remove();
+  const el = document.createElement("div");
+  el.className = `msg ${role}`;
+  el.textContent = text;
+  if (data) {
+    const meta = document.createElement("div");
+    meta.className = "meta";
+    meta.innerHTML = `${data.latency_ms} ms · <button>${data.recalled.length} memories used</button>`;
+    meta.querySelector("button").onclick = () => { renderRecall(data.recalled); showTab("recall"); };
+    el.appendChild(meta);
+  }
+  box.appendChild(el);
+  box.scrollTop = box.scrollHeight;
+}
+
+function renderRecall(items) {
+  const list = $("recallList");
+  if (!items.length) { list.className = "empty"; list.textContent = "No memories were relevant to this message."; return; }
+  list.className = "";
+  list.innerHTML = items.map((m) => `
+    <div class="card">
+      <div class="row"><span>${esc(m.text)}</span><span class="tag" style="background:${catColor(m.category)}">${m.category}</span></div>
+      <div class="meta">score ${m.score} · similarity ${m.similarity}</div>
+      <div class="bar"><span style="width:${Math.round(Math.min(1, m.score) * 100)}%"></span></div>
+    </div>`).join("");
+}
+
+async function loadMemories() {
+  const items = await (await fetch(`/users/${user()}/memories`)).json();
+  const list = $("memList");
+  if (!items.length) { list.innerHTML = `<p class="empty">No memories yet.</p>`; return; }
+  list.innerHTML = items.map((m) => `
+    <div class="card"><div class="row">
+      <span>${esc(m.text)}</span>
+      <span><span class="tag" style="background:${catColor(m.category)}">${m.category}</span>
+      <button class="del" title="Forget" data-id="${m.id}">×</button></span>
+    </div></div>`).join("");
+  list.querySelectorAll(".del").forEach((b) => b.onclick = async () => {
+    await fetch(`/users/${user()}/memories/${b.dataset.id}`, { method: "DELETE" });
+    loadMemories();
+  });
+}
+
+async function loadMap() {
+  mapPoints = await (await fetch(`/users/${user()}/memory-map`)).json();
+  const canvas = $("map");
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = canvas.clientWidth * dpr; canvas.height = canvas.clientHeight * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const w = canvas.clientWidth, h = canvas.clientHeight, pad = 24;
+  ctx.clearRect(0, 0, w, h);
+  if (!mapPoints.length) { ctx.fillStyle = catColor("other"); ctx.fillText("No memories yet.", pad, pad); return; }
+  const xs = mapPoints.map((p) => p.x), ys = mapPoints.map((p) => p.y);
+  const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
+  mapPoints.forEach((p) => {
+    p.px = x1 === x0 ? w / 2 : pad + ((p.x - x0) / (x1 - x0)) * (w - 2 * pad);
+    p.py = y1 === y0 ? h / 2 : pad + ((p.y - y0) / (y1 - y0)) * (h - 2 * pad);
+    ctx.beginPath(); ctx.arc(p.px, p.py, 6, 0, Math.PI * 2);
+    ctx.fillStyle = catColor(p.category); ctx.fill();
+  });
+  $("legend").innerHTML = CATS.map((c) => `<span><i style="background:${catColor(c)}"></i>${c}</span>`).join("");
+}
+
+$("map").addEventListener("mousemove", (e) => {
+  const r = e.target.getBoundingClientRect();
+  const x = e.clientX - r.left, y = e.clientY - r.top;
+  const hit = mapPoints.find((p) => Math.hypot(p.px - x, p.py - y) < 9);
+  $("hover").textContent = hit ? hit.text : "Hover a point to see the memory.";
+});
+
+async function loadLogs() {
+  const data = await (await fetch(`/users/${user()}/logs?limit=30`)).json();
+  $("logStats").innerHTML = `<div><b>${data.stats.turns}</b><span>turns</span></div><div><b>${data.stats.avg_latency_ms}</b><span>avg ms</span></div>`;
+  $("logList").innerHTML = data.items.map((l) => `
+    <div class="card">
+      <div><b>${esc(l.user_message)}</b></div>
+      <div class="meta">${new Date(l.ts * 1000).toLocaleString()} · ${l.thread_id} · ${l.latency_ms} ms · recalled ${l.recalled.length} · stored ${l.stored.length}</div>
+    </div>`).join("") || `<p class="empty">No turns yet.</p>`;
+}
+
+function showTab(name) {
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("active", b.dataset.tab === name));
+  document.querySelectorAll(".pane").forEach((p) => p.classList.toggle("active", p.id === `pane-${name}`));
+  if (name === "memories") loadMemories();
+  if (name === "map") loadMap();
+  if (name === "logs") loadLogs();
+}
+document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const text = $("input").value.trim();
+  if (!text) return;
+  $("input").value = ""; $("send").disabled = true;
+  addMessage("user", text);
+  try {
+    const res = await fetch("/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: $("userId").value.trim() || "demo", thread_id: $("threadId").value.trim() || "main", message: text, use_memory: $("useMemory").checked }),
+    });
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const data = await res.json();
+    addMessage("ai", data.reply, data);
+    renderRecall(data.recalled);
+  } catch (err) {
+    addMessage("ai", `Something went wrong: ${err.message}`);
+  } finally {
+    $("send").disabled = false; $("input").focus();
+  }
+});
+$("input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("form").requestSubmit(); } });
+</script>
+</body>
+</html>
