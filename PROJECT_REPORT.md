@@ -74,6 +74,10 @@ flowchart LR
     E --> C
     G <--> K[(Thread state)]
     API --> L[(SQLite logs)]
+    classDef default fill:#dbe6f0,stroke:#1f5b8f,color:#15212b
+    classDef io fill:#1f5b8f,stroke:#1f5b8f,color:#ffffff
+    classDef store fill:#a8661a,stroke:#a8661a,color:#ffffff
+    class C,K,L store
 ```
 
 The dashed line runs in the background after the reply is sent. Every model call goes through a retry wrapper, and Chroma DB uses local all-MiniLM-L6-v2 embeddings.
@@ -115,6 +119,10 @@ flowchart LR
     H -.-> I[Extract facts] --> J{Duplicate?}
     J -- yes --> K[Update] --> DB[(Chroma)]
     J -- no --> L[Add] --> DB
+    classDef default fill:#dbe6f0,stroke:#1f5b8f,color:#15212b
+    classDef io fill:#1f5b8f,stroke:#1f5b8f,color:#ffffff
+    classDef store fill:#a8661a,stroke:#a8661a,color:#ffffff
+    class DB store
 ```
 
 Recall embeds the message, searches Chroma DB for this user and keeps the top 5 after re-ranking (section 7.3). The reply prompt holds the system rules, those facts, the running summary and the recent messages. Dashed steps run in the background.
@@ -122,6 +130,7 @@ Recall embeds the message, searches Chroma DB for this user and keeps the top 5 
 ### 6.2 The same flow over time
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'actorBkg':'#dbe6f0','actorBorder':'#1f5b8f','actorTextColor':'#15212b','signalColor':'#56636e','signalTextColor':'#56636e','noteBkgColor':'#f6ead9','noteBorderColor':'#a8661a','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant U as User
     participant A as App
@@ -192,6 +201,9 @@ flowchart LR
     B -- no --> F[Keep all]
     B -- yes --> C[Oldest 8] --> D[Update summary]
     B -- yes --> E[Newest 8 kept]
+    classDef default fill:#dbe6f0,stroke:#1f5b8f,color:#15212b
+    classDef io fill:#1f5b8f,stroke:#1f5b8f,color:#ffffff
+    classDef store fill:#a8661a,stroke:#a8661a,color:#ffffff
 ```
 
 Summarising waits until the thread holds 16 messages, then trims it back to the newest 8. That costs one extra model call every 4 turns rather than one on every turn, and the prompt never holds more than the summary plus 16 messages, however long the conversation gets. Long-term facts don't depend on this, because they live in Chroma.
@@ -213,6 +225,10 @@ flowchart LR
     C -- yes --> D{Retries left?}
     D -- yes --> W[Wait, back off] --> A
     D -- no --> Y(["Model busy"])
+    classDef default fill:#dbe6f0,stroke:#1f5b8f,color:#15212b
+    classDef io fill:#1f5b8f,stroke:#1f5b8f,color:#ffffff
+    classDef store fill:#a8661a,stroke:#a8661a,color:#ffffff
+    class X,Y,Z io
 ```
 
 "Temporary" means a 503, 429, quota error, timeout or dropped connection; anything else, like a bad key, fails straight away. Waits grow 1.5 s, 3 s, 6 s, 12 s, with a little random jitter, for up to 4 retries. After that the API returns "The model is busy right now", and the UI shows that message rather than a generic server error. The evaluation skips and counts busy probes instead of crashing.
@@ -281,6 +297,9 @@ flowchart LR
     D --> F[Score + time]
     E --> F
     F --> G[results.md]
+    classDef default fill:#dbe6f0,stroke:#1f5b8f,color:#15212b
+    classDef io fill:#1f5b8f,stroke:#1f5b8f,color:#ffffff
+    classDef store fill:#a8661a,stroke:#a8661a,color:#ffffff
 ```
 
 - **Continuity** is the share of probe questions answered correctly using facts from an earlier conversation. Each probe runs in a brand-new thread, so the conversation history can't help; only long-term memory can.

@@ -125,6 +125,10 @@ flowchart LR
     API -.-> E[Fact extractor] --> C
     E --> M
     API --> L[(SQLite logs)]
+    classDef default fill:#dbe6f0,stroke:#1f5b8f,color:#15212b
+    classDef io fill:#1f5b8f,stroke:#1f5b8f,color:#ffffff
+    classDef store fill:#a8661a,stroke:#a8661a,color:#ffffff
+    class C,K,L store
 ```
 
 Two flows happen for every message:
@@ -139,6 +143,7 @@ Two flows happen for every message:
 Say user `demo` types **"What am I studying?"** in thread `test2`.
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{'actorBkg':'#dbe6f0','actorBorder':'#1f5b8f','actorTextColor':'#15212b','signalColor':'#56636e','signalTextColor':'#56636e','noteBkgColor':'#f6ead9','noteBorderColor':'#a8661a','sequenceNumberColor':'#ffffff'}}}%%
 sequenceDiagram
     participant B as Browser
     participant A as api.py
