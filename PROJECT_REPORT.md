@@ -10,12 +10,14 @@
 
 This is a chat assistant that remembers the people it talks to. If you tell it your name, your course or that you're vegetarian, it stores those facts and uses them in later conversations, even brand-new ones. It also keeps each conversation short by summarising older messages, so it stays fast as a chat grows.
 
+It can also manage its own memory: ask it to remember or forget something and it uses memory tools to do so. Replies stream in word by word, and chats are saved so you can reopen them after a restart.
+
 It has two kinds of memory:
 
 - **Long-term memory:** durable facts about each user, stored as vectors in Chroma DB and found again by meaning, not exact words.
 - **Short-term (contextual) memory:** the current conversation, kept by LangGraph, with older turns folded into a running summary.
 
-A FastAPI backend serves the chat and a web page that shows which memories were used for every reply, everything the assistant knows about you, a 2-D map of those memories, and a log of every turn with its response time. An evaluation script measures how well it remembers across conversations, with memory switched on versus off.
+A FastAPI backend serves the chat and a web page with a list of saved chats, the memories used for every reply, everything the assistant knows about you (searchable and editable), a 2-D map of those memories, and a log of every turn with its timings. An evaluation script measures how well it remembers across conversations, with memory switched on versus off.
 
 ---
 
@@ -40,7 +42,10 @@ I wanted to understand how to build that properly: how to decide what's worth re
 | Only bring back what's relevant | Semantic search plus re-ranking by importance and recency |
 | Handle corrections ("actually, it's called Ember & Oak now") | Near-duplicate facts replace the old one |
 | Keep replies fast as chats grow | Rolling summary of older turns; memory saving runs in the background |
-| Make memory visible and editable | UI panels for recalled memories, all memories (with delete), memory map and logs |
+| Make memory visible and editable | UI panels for recalled memories, all memories (search, filter, add, edit, delete, export), memory map and logs |
+| Let the user direct memory | Memory tools the model calls when asked to remember, look up or forget something |
+| Feel responsive | Replies stream word by word; time to first word is shown |
+| Keep conversations | Chats saved to SQLite, listed in a sidebar and reopened after restarts |
 | Measure the effect of memory | Evaluation comparing continuity with memory on vs off, plus latency |
 | Work with free or local models | Pluggable providers: Gemini (free key), OpenAI, Ollama (fully local) |
 
@@ -50,12 +55,12 @@ I wanted to understand how to build that properly: how to decide what's worth re
 
 | Tool | Used for | Why |
 |---|---|---|
-| **LangGraph** | The agent's workflow (recall → respond → summarise) | Explicit steps and state, a built-in checkpointer for per-conversation memory, and easy conditional branches |
+| **LangGraph** | The agent's workflow (recall → respond ⇄ tools → summarise) | Explicit steps and state, a tool-calling loop, token streaming, a SQLite checkpointer for saved chats, and easy conditional branches |
 | **LangChain** | Message types and model integrations | One interface for Gemini, OpenAI and Ollama |
 | **Chroma DB** | Long-term memory store | Lightweight, runs locally, persistent, supports metadata filters (per user) and cosine search |
 | **sentence-transformers (all-MiniLM-L6-v2)** | Turning text into vectors | Free, runs locally, fast on a laptop, good quality for short sentences |
-| **FastAPI** | Web API and serving the UI | Fast, typed request models, background tasks for memory saving, automatic docs at `/docs` |
-| **SQLite** | Interaction log | Zero setup, enough for one machine |
+| **FastAPI** | Web API and serving the UI | Fast, typed request models, Server-Sent Events for streaming, background tasks for memory saving, automatic docs at `/docs` |
+| **SQLite** | Saved chats and the interaction log | Zero setup, enough for one machine |
 | **NumPy** | PCA for the memory map | Simple 2-D projection of embeddings |
 | **pytest + GitHub Actions** | Tests on every push | Tests run offline with fakes, so CI needs no API key |
 
@@ -65,14 +70,16 @@ I wanted to understand how to build that properly: how to decide what's worth re
 
 ```mermaid
 flowchart LR
-    UI[Web UI] --> API[FastAPI]
+    UI[Web UI] -- SSE --> API[FastAPI]
     API --> G[LangGraph agent]
     API -.-> E[Fact extractor]
     G --> LLM[Chat model]
     E --> LLM
     G <--> C[(Chroma DB)]
+    G <--> T[Memory tools]
+    T --> C
     E --> C
-    G <--> K[(Thread state)]
+    G <--> K[(Saved chats)]
     API --> L[(SQLite logs)]
     classDef default fill:#dbe6f0,stroke:#1f5b8f,color:#15212b
     classDef io fill:#1f5b8f,stroke:#1f5b8f,color:#ffffff
@@ -80,22 +87,23 @@ flowchart LR
     class C,K,L store
 ```
 
-The dashed line runs in the background after the reply is sent. Every model call goes through a retry wrapper, and Chroma DB uses local all-MiniLM-L6-v2 embeddings.
+The dashed line runs in the background after the reply is sent. Memory tools run inside the agent's loop, using the current user's id from the server. Every model call goes through a retry wrapper, and Chroma DB uses local all-MiniLM-L6-v2 embeddings.
 
 ### Code layout
 
 ```
 app/
   api.py              FastAPI routes, error handling, start-up warm-up
-  service.py          Assistant: runs the graph, saves memories, logs turns
-  graph.py            LangGraph agent: recall -> respond -> summarise
+  service.py          Assistant: runs and streams the graph, saves memories, manages chats
+  graph.py            LangGraph agent: recall -> respond <-> tools -> summarise
   memory/
     long_term.py      Chroma DB store, ranking, de-duplication, PCA map
     short_term.py     Rolling-summary helpers
     extractor.py      Fact extraction prompt and JSON parsing
+    tools.py          Memory tools: search, save, forget
   retry.py            Retries for busy / rate-limited model calls
   llm.py              Model and embedding factories, reply-text helper
-  logs.py             SQLite interaction log
+  logs.py             SQLite interaction log and chat list
   config.py           Settings from .env
   static/index.html   Web UI
 eval/                 Evaluation scenarios, metrics and runner
@@ -113,6 +121,7 @@ flowchart LR
     A[Message] --> C{Memory on?}
     C -- yes --> D[Recall + rank] --> E[Respond]
     C -- no --> E
+    E <-- tool calls --> T[Memory tools]
     E --> F{"16+ msgs?"}
     F -- yes --> G[Summarise] --> H[Reply]
     F -- no --> H
@@ -125,7 +134,7 @@ flowchart LR
     class DB store
 ```
 
-Recall embeds the message, searches Chroma DB for this user and keeps the top 5 after re-ranking (section 7.3). The reply prompt holds the system rules, those facts, the running summary and the recent messages. Dashed steps run in the background.
+Recall embeds the message, searches Chroma DB for this user and keeps the top 5 after re-ranking (section 7.3). The reply prompt holds the system rules, a short guide to the memory tools, those facts, the running summary and the recent messages. If the model calls a tool, the result goes back to it and it answers again (section 7.5). The reply streams to the browser as it's written. Dashed steps run in the background.
 
 ### 6.2 The same flow over time
 
@@ -206,7 +215,33 @@ flowchart LR
     classDef store fill:#a8661a,stroke:#a8661a,color:#ffffff
 ```
 
-Summarising waits until the thread holds 16 messages, then trims it back to the newest 8. That costs one extra model call every 4 turns rather than one on every turn, and the prompt never holds more than the summary plus 16 messages, however long the conversation gets. Long-term facts don't depend on this, because they live in Chroma.
+Summarising waits until the thread holds 16 messages, then trims it back to about the newest 8. The cut always lands on a user message, so a tool call is never separated from its result. That costs one extra model call every 4 turns rather than one on every turn, and the prompt never holds more than the summary plus 16 messages, however long the conversation gets. Long-term facts don't depend on this, because they live in Chroma.
+
+### 7.5 Letting the assistant manage its memory
+
+Automatic extraction catches facts said in passing, but it can't act on "forget that" or look up a detail that wasn't recalled. So the model also gets three tools:
+
+| Tool | Used when |
+|---|---|
+| `search_memory` | It needs a personal detail it wasn't given, or an id before forgetting |
+| `save_memory` | The user asks it to remember something |
+| `forget_memory` | The user asks it to forget something or says a fact is wrong |
+
+```mermaid
+flowchart LR
+    U([Forget my sister's name]) --> R[Respond] --> S[search_memory] --> R2[Respond] --> F[forget_memory] --> R3[Respond] --> A([Done, I've forgotten it])
+    classDef default fill:#dbe6f0,stroke:#1f5b8f,color:#15212b
+    classDef io fill:#1f5b8f,stroke:#1f5b8f,color:#ffffff
+    class U,A io
+```
+
+Three safeguards keep this predictable:
+
+- **The user id comes from the server, not the model**, so a tool can only see or change the current user's memories.
+- **At most 3 rounds of tool calls per message.** After that the model must answer in text.
+- **`save_memory` goes through the same de-duplication** as automatic saving, so asking twice doesn't create two copies.
+
+Each tool use appears under the reply as a chip ("Saved: The user's sister is called Asha.") and is recorded in the log.
 
 ---
 
@@ -237,6 +272,7 @@ flowchart LR
 
 | Technique | Effect |
 |---|---|
+| Streaming over Server-Sent Events | Text appears as it's written; the recalled memories show before the first word |
 | Fact extraction in a background task | The user waits for one model call, not two |
 | Rolling summary in batches | The prompt stays small, and the extra summary call happens once every 4 turns, not every turn |
 | Low Gemini 3 thinking level | Answers start much sooner |
@@ -252,35 +288,46 @@ The recall step (embedding + Chroma search) runs locally and is reported separat
 
 | Method | Path | Purpose |
 |---|---|---|
-| POST | `/chat` | Send a message; returns the reply, memories used and latency |
+| POST | `/chat` | Send a message; returns the reply, memories used, tools used and latency |
+| POST | `/chat/stream` | The same as a stream: `recalled`, `token`…, `tools`, `done` |
+| GET | `/users/{user_id}/threads` | Saved chats with titles |
+| GET | `/users/{user_id}/threads/{thread_id}/messages` | A chat's full history |
+| DELETE | `/users/{user_id}/threads/{thread_id}` | Delete a chat (memories stay) |
 | GET | `/users/{user_id}/memories` | List stored memories |
 | POST | `/users/{user_id}/memories` | Add a memory by hand |
+| PATCH | `/users/{user_id}/memories/{id}` | Edit a memory's text, category or importance |
 | DELETE | `/users/{user_id}/memories/{id}` | Forget a memory |
 | GET | `/users/{user_id}/memory-map` | 2-D PCA coordinates for the map |
 | GET | `/users/{user_id}/threads/{thread_id}/summary` | A thread's running summary |
 | GET | `/users/{user_id}/logs` | Recent turns and average latency |
 
-The web page has a chat window and four panels:
+The web page has three columns:
 
-- **Recalled:** the memories used for the last reply, with similarity and final score.
-- **Memories:** everything stored for the user, with a delete button for each item.
-- **Map:** memories as points, projected to 2-D with PCA and coloured by category; similar facts sit close together.
-- **Logs:** every turn with its time, response time, memories recalled and memories stored.
+- **Chats:** saved conversations, newest first, with **+ New chat** and delete. On small screens it slides in from the side.
+- **Conversation:** streamed replies with simple formatting, and chips under each reply for time to first word, total time, memories used and each memory tool used. Suggestions on the welcome screen show what to try.
+- **Side panel:**
+  - **Recalled:** the memories used for the last reply, with similarity and final score.
+  - **Memories:** everything stored for the user, with search, category filters, add, edit (text, category, importance), delete and export to JSON.
+  - **Map:** memories as points, projected to 2-D with PCA and coloured by category; similar facts sit close together.
+  - **Logs:** turns, median reply time, median time to first word, memory tool uses, and every turn.
 
-A **memory** tick box turns recall off, so you can compare answers with and without it.
+A **Memory** switch turns recall, saving and tools off, so you can compare answers with and without memory. It follows the system's light or dark mode.
 
 ---
 
 ## 10. Testing
 
-The tests run offline. They use an in-memory vector store, hashing embeddings and a scripted model, so they need no network and no API key. GitHub Actions runs them on every push.
+The tests run offline. They use an in-memory vector store, hashing embeddings and scripted models (including scripted tool calls and a fake streaming model), so they need no network and no API key. GitHub Actions runs all 36 on every push, on Python 3.11 and 3.12.
 
 | Area | What is checked |
 |---|---|
-| Long-term memory | Relevant fact is recalled; users are isolated; near-duplicates update instead of adding; delete only works for the owner; unknown categories fall back |
+| Long-term memory | Relevant fact is recalled; users are isolated; near-duplicates update instead of adding; delete and edit only work for the owner; unknown categories fall back |
+| Memory tools | Save, search then forget; another user can't forget your memory; tools can be turned off; tool chips reset each turn |
+| Streaming | Events arrive in order (`recalled`, tokens, `done`); the streamed text matches the saved reply; time to first token is recorded |
+| Saved chats | Chats are listed newest first with titles, reopened with full history and deleted; old log databases are upgraded |
 | Ranking | Recency halves after 30 days; importance breaks ties |
 | Extraction parsing | Code fences, out-of-range importance, garbage and empty output, plain strings |
-| Short-term memory | Summary split keeps the recent window; short threads aren't summarised |
+| Short-term memory | Summary split keeps the recent window; short threads aren't summarised; the kept part never starts with a tool result |
 | Agent end-to-end | A fact told in one thread is recalled in another; memory can be switched off; long threads get summarised |
 | Retries | Busy errors are retried, real errors are not, and the app gives up cleanly |
 | Other | Interaction log round trip; keyword matching; Gemini content blocks; `.env` inline comments |
@@ -312,7 +359,7 @@ There are 8 personas and 20 probe questions. Each can be run several times with 
 Run it with:
 
 ```bash
-python -m eval.run_eval --runs 3 --delay 4
+python -m eval.run_eval --runs 3 --delay 5
 ```
 
 ---
@@ -324,8 +371,11 @@ python -m eval.run_eval --runs 3 --delay 4
 - The assistant runs locally on a MacBook Air with Gemini and local embeddings, and replies through the web UI.
 - Facts are extracted in the background, stored in Chroma DB and kept between restarts.
 - Conversations are summarised once they pass the recent-message window.
+- The assistant saves, looks up and forgets memories itself when asked, with each action shown under the reply.
+- Replies stream word by word, and chats are saved and reopened after restarts.
+- Memories can be searched, filtered, added, edited, deleted and exported from the UI.
 - Busy and rate-limit errors are retried and reported clearly.
-- All 25 tests pass on Python 3.12, and they run on every push through GitHub Actions.
+- All 36 tests pass on Python 3.11 and 3.12, and they run on every push through GitHub Actions.
 
 ### Results
 
@@ -348,6 +398,8 @@ Measured on a MacBook Air with Gemini 3.5 Flash Lite and local all-MiniLM-L6-v2 
 
 **How much to trust it**
 
+These were measured before the memory tools and streaming were added. The evaluation calls `chat()` with the same recall step, so continuity should be similar; total time is unchanged by streaming, though the first words now appear sooner.
+
 These numbers come from a small test set: 20 questions, one run, scored by keyword matching. They show the method works, not that it would score 100% on any conversation. Running `--runs 5` (100 probes) and adding an LLM judge would make them stronger; both are listed as next steps.
 
 ---
@@ -362,6 +414,8 @@ These numbers come from a small test set: 20 questions, one run, scored by keywo
 | Messy model output | Fact extraction sometimes wraps JSON in code fences or adds text | A tolerant parser that never crashes on bad output |
 | Measuring honestly | "Better continuity" means nothing without a baseline | The evaluation always runs the same questions with memory off as well: 100% with memory vs 10% without |
 | Free-tier limits | Gemini 3.8 Flash allowed 5 requests a minute and 20 a day, and each message uses about 2 | Switched to Gemini 3.5 Flash Lite (15 a minute, 500 a day) and added a `--delay` option to the evaluation |
+| Tool calls and summaries | Trimming old messages could leave a tool result without the call that produced it, which chat APIs reject | The cut point always moves to a user message |
+| Streaming the right text | The summary step also produces text, which shouldn't appear in the chat | Only chunks from the `respond` step are streamed |
 
 ---
 
@@ -369,16 +423,14 @@ These numbers come from a small test set: 20 questions, one run, scored by keywo
 
 **Limitations**
 
-- Conversation threads live in memory and reset when the server restarts (long-term memories don't).
-- The evaluation is small (20 questions, one run).
+- The evaluation is small (20 questions, one run) and doesn't yet test the memory tools.
 - Keyword-based scoring is simple; it can't tell a correct answer from one that mentions the keyword for another reason.
-- Fact extraction costs a second model call per message.
+- Fact extraction costs a second model call per message, and each tool use adds another.
 - Built for one machine: no authentication and a single SQLite file.
 
 **Next steps**
 
-- Let the agent call memory tools itself (search, save, forget) instead of always recalling.
-- Stream replies over Server-Sent Events, so text appears as it's generated.
-- Store threads in a persistent checkpointer (SQLite or Postgres).
-- Use an LLM judge alongside keywords in the evaluation.
+- Use an LLM judge alongside keywords, and add evaluation cases for "remember" and "forget".
+- An `update_memory` tool, so corrections happen in place.
+- A stop button for streaming replies.
 - Add memory decay and periodic merging of related facts.

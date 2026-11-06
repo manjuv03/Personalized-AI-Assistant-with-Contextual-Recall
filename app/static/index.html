@@ -30,13 +30,14 @@
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 var(--display); }
-  button, input, textarea { font: inherit; color: inherit; }
+  button, input, textarea, select { font: inherit; color: inherit; }
   button { cursor: pointer; }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  [hidden] { display: none !important; }
 
   /* layout */
   .app { display: grid; grid-template-rows: auto 1fr; height: 100vh; }
-  header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; padding: 14px 24px; border-bottom: 1px solid var(--rule); background: var(--surface); }
+  header { display: flex; flex-wrap: wrap; gap: 12px 20px; align-items: center; justify-content: space-between; padding: 12px 20px; border-bottom: 1px solid var(--rule); background: var(--surface); }
   .brand { display: flex; gap: 12px; align-items: center; min-width: 0; }
   .logo { width: 34px; height: 34px; border-radius: 9px; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 800; font-size: 15px; letter-spacing: -.02em; flex: none; }
   .brand h1 { margin: 0; font-size: 19px; font-weight: 800; font-stretch: 85%; line-height: 1.1; }
@@ -49,6 +50,9 @@
   .field:focus-within { border-color: var(--accent); }
   .btn { border: 1px solid var(--rule); background: var(--surface); border-radius: 999px; padding: 6px 14px; font-size: 14px; font-weight: 600; }
   .btn:hover { border-color: var(--accent); color: var(--accent); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .btn.primary:hover { color: var(--accent-ink); filter: brightness(1.08); }
+  .btn.small { padding: 4px 11px; font-size: 13px; }
   .switch { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; user-select: none; }
   .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
   .track { width: 38px; height: 22px; border-radius: 999px; background: var(--rule); position: relative; transition: background .15s; }
@@ -56,9 +60,31 @@
   .switch input:checked + .track { background: var(--accent); }
   .switch input:checked + .track::after { transform: translateX(16px); }
   .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #chatsToggle { display: none; }
 
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; min-height: 0; }
+  main { display: grid; grid-template-columns: 250px minmax(0, 1fr) 380px; min-height: 0; }
+  @media (max-width: 1180px) {
+    main { grid-template-columns: minmax(0, 1fr) 360px; }
+    #chats { position: fixed; z-index: 10; top: 0; bottom: 0; left: 0; width: 280px; box-shadow: 0 0 40px rgba(0,0,0,.25); transform: translateX(-105%); transition: transform .2s; }
+    #chats.open { transform: none; }
+    #chatsToggle { display: inline-block; }
+  }
   @media (max-width: 880px) { .app { height: auto; } main { grid-template-columns: 1fr; } #side { border-left: 0; border-top: 1px solid var(--rule); } #messages { min-height: 55vh; } }
+
+  /* chats sidebar */
+  #chats { background: var(--surface); border-right: 1px solid var(--rule); display: flex; flex-direction: column; min-height: 0; }
+  .chats-head { padding: 14px; display: grid; gap: 10px; }
+  .chats-head .btn { width: 100%; padding: 9px 14px; }
+  #chatList { list-style: none; margin: 0; padding: 0 8px 14px; overflow-y: auto; flex: 1; }
+  #chatList li { display: flex; align-items: center; gap: 4px; border-radius: 8px; }
+  #chatList li:hover { background: var(--surface-2); }
+  #chatList li.active { background: var(--accent-soft); }
+  #chatList .open { flex: 1; min-width: 0; text-align: left; border: 0; background: transparent; padding: 9px 10px; display: grid; gap: 1px; }
+  #chatList .t { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #chatList .s { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  #chatList .x { border: 0; background: transparent; color: var(--muted); font-size: 17px; padding: 4px 8px; opacity: 0; }
+  #chatList li:hover .x, #chatList li:focus-within .x { opacity: 1; }
+  #chatList .x:hover { color: var(--warm); }
 
   /* chat */
   #chat { display: flex; flex-direction: column; min-height: 0; }
@@ -75,18 +101,21 @@
   .bubble ul, .bubble ol { margin: 4px 0 8px; padding-left: 20px; }
   .bubble code { font-family: var(--mono); font-size: 13.5px; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
   .bubble.error { border-color: var(--warm); background: var(--warm-soft); font-family: var(--display); font-size: 15px; }
-  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .caret::after { content: "▍"; color: var(--accent); margin-left: 1px; animation: caret 1s steps(2) infinite; }
+  @keyframes caret { 50% { opacity: 0; } }
+  .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-family: var(--display); }
   .chip { font-family: var(--mono); font-size: 12px; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--rule); color: var(--muted); background: transparent; }
   button.chip:hover { border-color: var(--accent); color: var(--accent); }
   .chip.mem { color: var(--accent); border-color: var(--accent); }
   .chip.off { color: var(--warm); border-color: var(--warm); }
+  .chip.tool { color: var(--ink); background: var(--warm-soft); border-color: transparent; }
   .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
   .typing i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: blink 1.2s infinite ease-in-out; }
   .typing i:nth-child(2) { animation-delay: .15s; } .typing i:nth-child(3) { animation-delay: .3s; }
   @keyframes blink { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
-  @media (prefers-reduced-motion: reduce) { .typing i { animation: none; opacity: .6; } }
+  @media (prefers-reduced-motion: reduce) { .typing i, .caret::after { animation: none; } }
 
-  .welcome { margin: auto; max-width: 520px; text-align: center; display: grid; gap: 14px; padding: 24px 0; }
+  .welcome { margin: auto; max-width: 540px; text-align: center; display: grid; gap: 14px; padding: 24px 0; }
   .welcome h2 { margin: 0; font-size: clamp(26px, 4vw, 34px); font-weight: 800; font-stretch: 80%; line-height: 1.1; }
   .welcome p { margin: 0; color: var(--muted); font-family: var(--body); font-size: 17px; }
   .suggest { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
@@ -94,7 +123,7 @@
   .suggest button:hover { border-color: var(--accent); color: var(--accent); }
   .steps { font-family: var(--mono); font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
 
-  form { display: flex; gap: 10px; align-items: flex-end; padding: 14px clamp(16px, 4vw, 48px) 18px; border-top: 1px solid var(--rule); background: var(--surface); }
+  form#form { display: flex; gap: 10px; align-items: flex-end; padding: 14px clamp(16px, 4vw, 48px) 18px; border-top: 1px solid var(--rule); background: var(--surface); }
   .composer { flex: 1; display: flex; border: 1px solid var(--rule); border-radius: 14px; background: var(--surface-2); padding: 4px; }
   .composer:focus-within { border-color: var(--accent); }
   .composer textarea { flex: 1; border: 0; background: transparent; resize: none; padding: 10px 12px; max-height: 160px; font-size: 16px; }
@@ -107,7 +136,7 @@
   .tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; padding: 12px 14px 0; }
   .tabs button { border: 0; background: transparent; padding: 9px 0 11px; color: var(--muted); font-weight: 600; font-size: 14px; border-bottom: 2px solid transparent; }
   .tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
-  .pane { display: none; padding: 18px; overflow-y: auto; flex: 1; border-top: 1px solid var(--rule); }
+  .pane { display: none; padding: 18px; overflow-y: auto; overflow-x: hidden; flex: 1; border-top: 1px solid var(--rule); min-width: 0; }
   .pane.active { display: block; }
   .label { font-family: var(--mono); font-size: 11.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin: 0 0 12px; font-weight: 500; }
   .card { border: 1px solid var(--rule); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 10px; background: var(--surface-2); }
@@ -117,26 +146,46 @@
   .scores { display: flex; gap: 14px; margin-top: 8px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
   .bar { height: 5px; background: var(--rule); border-radius: 3px; margin-top: 8px; overflow: hidden; }
   .bar span { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
-  .del { border: 0; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; padding: 0 2px; }
-  .del:hover { color: var(--warm); }
+  .icon { border: 0; background: transparent; color: var(--muted); font-size: 15px; line-height: 1; padding: 2px 4px; border-radius: 4px; }
+  .icon:hover { color: var(--accent); }
+  .icon.del:hover { color: var(--warm); }
+  .actions { display: flex; gap: 2px; align-items: center; }
   .empty { color: var(--muted); font-family: var(--body); font-size: 15.5px; }
-  .count { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-left: 6px; }
+
+  .mtools { display: grid; gap: 10px; margin-bottom: 14px; }
+  .mrow { display: flex; gap: 6px; min-width: 0; }
+  .mrow .btn { white-space: nowrap; flex: none; }
+  .search { flex: 1; min-width: 0; width: 100%; border: 1px solid var(--rule); border-radius: 999px; background: var(--surface-2); padding: 6px 14px; font-size: 14px; }
+  .search:focus { outline: none; border-color: var(--accent); }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; }
+  .filters button { font-family: var(--mono); font-size: 12px; border: 1px solid var(--rule); background: transparent; border-radius: 999px; padding: 2px 10px; color: var(--muted); }
+  .filters button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .editor { display: grid; gap: 8px; min-width: 0; }
+  .editor > * { min-width: 0; }
+  .editor textarea { width: 100%; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); padding: 8px 10px; font-family: var(--body); font-size: 15px; resize: vertical; min-height: 60px; }
+  .editor .line { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 13px; color: var(--muted); }
+  .editor select { border: 1px solid var(--rule); border-radius: 6px; background: var(--surface); padding: 4px 8px; font-size: 13px; }
+  .editor input[type=range] { accent-color: var(--accent); width: 110px; }
+  .editor .end { display: flex; gap: 8px; justify-content: flex-end; }
+
   canvas { width: 100%; height: 300px; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface-2); display: block; }
   #hover { font-family: var(--body); font-size: 15px; min-height: 24px; margin-top: 10px; }
   .legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
-  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
-  .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
+  .legend i { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px; }
+  .tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; margin-bottom: 16px; }
   .tile { background: var(--surface-2); padding: 12px; display: grid; gap: 2px; }
   .tile b { font-size: 22px; font-weight: 800; font-stretch: 80%; font-variant-numeric: tabular-nums; }
   .tile span { font-size: 12px; color: var(--muted); }
   .log q { quotes: none; font-weight: 600; font-size: 15px; display: block; }
   .log .scores { flex-wrap: wrap; gap: 4px 12px; }
+  .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.3); z-index: 9; }
 </style>
 </head>
 <body>
 <div class="app">
   <header>
     <div class="brand">
+      <button class="btn" id="chatsToggle" type="button" aria-controls="chats" aria-expanded="false">Chats</button>
       <div class="logo" aria-hidden="true">CR</div>
       <div>
         <h1>Contextual Recall</h1>
@@ -145,13 +194,16 @@
     </div>
     <div class="controls">
       <div class="field"><label for="userId">user</label><input id="userId" value="demo" autocomplete="off"></div>
-      <div class="field"><label for="threadId">thread</label><input id="threadId" value="main" autocomplete="off"></div>
-      <button class="btn" id="newThread" type="button" title="Start a fresh conversation">New chat</button>
-      <label class="switch"><input type="checkbox" id="useMemory" checked><span class="track"></span>Memory</label>
+      <label class="switch" title="Recall, save and use memories"><input type="checkbox" id="useMemory" checked><span class="track"></span>Memory</label>
     </div>
   </header>
 
   <main>
+    <nav id="chats" aria-label="Chats">
+      <div class="chats-head"><button class="btn primary" id="newChat" type="button">+ New chat</button></div>
+      <ul id="chatList"></ul>
+    </nav>
+
     <section id="chat" aria-label="Conversation">
       <div id="messages" aria-live="polite"></div>
       <form id="form">
@@ -168,7 +220,19 @@
         <button data-tab="logs" role="tab">Logs</button>
       </div>
       <div class="pane active" id="pane-recall"><p class="label">Used for the last reply</p><div id="recallList"><p class="empty">Memories used for each reply appear here.</p></div></div>
-      <div class="pane" id="pane-memories"><p class="label">Everything remembered<span class="count" id="memCount"></span></p><div id="memList"></div></div>
+      <div class="pane" id="pane-memories">
+        <p class="label">Everything remembered <span id="memCount"></span></p>
+        <div class="mtools">
+          <div class="mrow">
+            <input class="search" id="memSearch" type="search" placeholder="Search memories" aria-label="Search memories">
+            <button class="btn small" id="memAdd" type="button">+ Add</button>
+            <button class="btn small" id="memExport" type="button" title="Download as JSON">Export</button>
+          </div>
+          <div class="filters" id="memFilters" role="group" aria-label="Filter by category"></div>
+          <div class="card editor" id="addForm" hidden></div>
+        </div>
+        <div id="memList"></div>
+      </div>
       <div class="pane" id="pane-map">
         <p class="label">Memory map · similar facts sit close together</p>
         <canvas id="map" aria-label="Memories plotted by meaning"></canvas>
@@ -188,18 +252,25 @@ const catColor = (c) => css(`--cat-${CATS.includes(c) ? c : "other"}`);
 const userId = () => $("userId").value.trim() || "demo";
 const user = () => encodeURIComponent(userId());
 const initials = () => (userId()[0] || "Y").toUpperCase();
-let mapPoints = [];
+const store = { get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (_) {} } };
+let threadId = store.get("cr-thread") || newId();
+let mapPoints = [], memories = [], memFilter = "all", busy = false;
 
-function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+function newId() { return `chat-${Date.now().toString(36)}`; }
+function esc(s) { const d = document.createElement("div"); d.textContent = s ?? ""; return d.innerHTML; }
 function fmtMs(ms) { return ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${Math.round(ms)} ms`; }
+function ago(ts) {
+  const s = Date.now() / 1000 - ts;
+  if (s < 60) return "just now"; if (s < 3600) return `${Math.floor(s / 60)} min ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)} h ago`; return new Date(ts * 1000).toLocaleDateString();
+}
 
 // Small, safe markdown: escape first, then bold, italics, inline code, lists and paragraphs.
 function md(text) {
   const lines = esc(text).split(/\n/);
-  let html = "", list = null;
+  let html = "", list = null, para = [];
   const inline = (s) => s.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<i>$2</i>");
   const close = () => { if (list) { html += `</${list}>`; list = null; } };
-  let para = [];
   const flush = () => { if (para.length) { html += `<p>${inline(para.join("<br>"))}</p>`; para = []; } };
   for (const line of lines) {
     const ul = line.match(/^\s*[-*•]\s+(.*)/), ol = line.match(/^\s*\d+[.)]\s+(.*)/);
@@ -215,20 +286,64 @@ function md(text) {
   return html;
 }
 
+/* ---------- chats ---------- */
+
+async function loadChats() {
+  const items = await (await fetch(`/users/${user()}/threads`)).json();
+  const list = $("chatList");
+  if (!items.length) { list.innerHTML = `<li><span class="s" style="padding:9px 10px">No saved chats yet.</span></li>`; return; }
+  list.innerHTML = items.map((t) => `
+    <li class="${t.thread_id === threadId ? "active" : ""}">
+      <button class="open" type="button" data-id="${esc(t.thread_id)}"><span class="t">${esc(t.title)}</span><span class="s">${ago(t.updated)} · ${t.turns} ${t.turns === 1 ? "message" : "messages"}</span></button>
+      <button class="x" type="button" data-del="${esc(t.thread_id)}" aria-label="Delete chat" title="Delete chat">×</button>
+    </li>`).join("");
+  list.querySelectorAll("[data-id]").forEach((b) => b.onclick = () => openChat(b.dataset.id));
+  list.querySelectorAll("[data-del]").forEach((b) => b.onclick = async () => {
+    if (!confirm("Delete this chat? Its long-term memories stay.")) return;
+    await fetch(`/users/${user()}/threads/${encodeURIComponent(b.dataset.del)}`, { method: "DELETE" });
+    if (b.dataset.del === threadId) startNewChat(); else loadChats();
+  });
+}
+
+async function openChat(id) {
+  threadId = id; store.set("cr-thread", id); closeDrawer();
+  const turns = await (await fetch(`/users/${user()}/threads/${encodeURIComponent(id)}/messages`)).json();
+  $("messages").innerHTML = "";
+  if (!turns.length) welcome();
+  turns.forEach((t) => {
+    addRow("user", esc(t.user_message).replace(/\n/g, "<br>"));
+    const row = addRow("ai", md(t.reply));
+    row.querySelector(".bubble").appendChild(metaFor({ ...t, use_memory: true }));
+  });
+  const last = turns[turns.length - 1];
+  renderRecall(last ? last.recalled : null);
+  loadChats();
+}
+
+function startNewChat() {
+  threadId = newId(); store.set("cr-thread", threadId); closeDrawer();
+  welcome();
+  renderRecall(null);
+  loadChats();
+  $("input").focus();
+}
+
 function welcome() {
   $("messages").innerHTML = `
     <div class="welcome">
-      <div class="steps">Tell · switch chat · ask</div>
+      <div class="steps">Tell · new chat · ask</div>
       <h2>An assistant that remembers you</h2>
-      <p>Tell it something about yourself, start a new chat, then ask about it. The panel on the right shows exactly what it remembered and used.</p>
+      <p>Tell it something about yourself, start a new chat, then ask about it. You can also say "remember that…" or "forget…", and the panel on the right shows exactly what it knows.</p>
       <div class="suggest">
         <button type="button" data-say="Hi, I'm Manju. I'm doing an MSc in Data Science at Queen Mary.">Introduce yourself</button>
-        <button type="button" data-say="I'm vegetarian and I love South Indian food.">Share a preference</button>
+        <button type="button" data-say="Remember that I'm vegetarian and love South Indian food.">Ask it to remember</button>
         <button type="button" data-say="What do you know about me?">What do you know about me?</button>
       </div>
     </div>`;
   $("messages").querySelectorAll("[data-say]").forEach((b) => b.onclick = () => { $("input").value = b.dataset.say; autosize(); $("input").focus(); });
 }
+
+/* ---------- messages ---------- */
 
 function addRow(role, html, opts = {}) {
   $("messages").querySelector(".welcome")?.remove();
@@ -236,23 +351,28 @@ function addRow(role, html, opts = {}) {
   row.className = `row ${role}`;
   row.innerHTML = `<div class="avatar" aria-hidden="true">${role === "user" ? esc(initials()) : "AI"}</div><div class="bubble${opts.error ? " error" : ""}">${html}</div>`;
   $("messages").appendChild(row);
-  $("messages").scrollTop = $("messages").scrollHeight;
+  scrollDown();
   return row;
 }
+function scrollDown() { const m = $("messages"); m.scrollTop = m.scrollHeight; }
 
-function addReply(data) {
-  const row = addRow("ai", md(data.reply));
+function metaFor(d) {
   const meta = document.createElement("div");
   meta.className = "meta";
-  const n = data.recalled.length;
-  meta.innerHTML = `<span class="chip">${fmtMs(data.latency_ms)}</span>` +
-    ($("useMemory").checked ? `<button type="button" class="chip mem">${n} ${n === 1 ? "memory" : "memories"} used</button>` : `<span class="chip off">memory off</span>`);
-  meta.querySelector("button")?.addEventListener("click", () => { renderRecall(data.recalled); showTab("recall"); });
-  row.querySelector(".bubble").appendChild(meta);
+  const n = (d.recalled || []).length;
+  let html = "";
+  if (d.first_token_ms != null) html += `<span class="chip" title="Time to the first word">first word ${fmtMs(d.first_token_ms)}</span>`;
+  html += `<span class="chip" title="Total time">${fmtMs(d.latency_ms)}</span>`;
+  html += d.use_memory === false ? `<span class="chip off">memory off</span>` : `<button type="button" class="chip mem">${n} ${n === 1 ? "memory" : "memories"} used</button>`;
+  (d.tools || []).forEach((t) => { html += `<span class="chip tool">${esc(t.label)}</span>`; });
+  meta.innerHTML = html;
+  meta.querySelector("button")?.addEventListener("click", () => { renderRecall(d.recalled || []); showTab("recall"); });
+  return meta;
 }
 
 function renderRecall(items) {
   const list = $("recallList");
+  if (items == null) { list.innerHTML = `<p class="empty">Memories used for each reply appear here.</p>`; return; }
   if (!items.length) { list.innerHTML = `<p class="empty">No stored memories were relevant to this message.</p>`; return; }
   list.innerHTML = items.map((m) => `
     <div class="card">
@@ -262,22 +382,147 @@ function renderRecall(items) {
     </div>`).join("");
 }
 
+// Read a Server-Sent Events stream from a POST response.
+async function* sse(res) {
+  const reader = res.body.getReader(), dec = new TextDecoder();
+  let buf = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buf += dec.decode(value, { stream: true });
+    let i;
+    while ((i = buf.indexOf("\n\n")) >= 0) {
+      const block = buf.slice(0, i); buf = buf.slice(i + 2);
+      const data = block.split("\n").filter((l) => l.startsWith("data:")).map((l) => l.slice(5).trim()).join("\n");
+      if (data) yield JSON.parse(data);
+    }
+  }
+}
+
+async function send(text) {
+  busy = true; $("send").disabled = true;
+  const useMemory = $("useMemory").checked;
+  addRow("user", esc(text).replace(/\n/g, "<br>"));
+  const row = addRow("ai", `<span class="typing" aria-label="Thinking"><i></i><i></i><i></i></span>`);
+  const bubble = row.querySelector(".bubble");
+  let streamed = "", tools = [];
+  try {
+    const res = await fetch("/chat/stream", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ user_id: userId(), thread_id: threadId, message: text, use_memory: useMemory }),
+    });
+    if (!res.ok || !res.body) throw new Error(`Server returned ${res.status}`);
+    for await (const ev of sse(res)) {
+      if (ev.type === "recalled") renderRecall(ev.recalled);
+      else if (ev.type === "tools") tools = ev.tools;
+      else if (ev.type === "token") { streamed += ev.text; bubble.innerHTML = md(streamed); bubble.classList.add("caret"); scrollDown(); }
+      else if (ev.type === "error") throw new Error(ev.detail);
+      else if (ev.type === "done") {
+        bubble.classList.remove("caret");
+        bubble.innerHTML = md(ev.reply || streamed || "(no reply)");
+        bubble.appendChild(metaFor({ ...ev, tools: ev.tools.length ? ev.tools : tools, use_memory: useMemory }));
+        renderRecall(ev.recalled);
+        scrollDown();
+      }
+    }
+    store.set("cr-thread", threadId);
+    loadChats();
+    if (tools.length || ($("pane-memories").classList.contains("active"))) setTimeout(loadMemories, 300);
+    if (useMemory && $("pane-memories").classList.contains("active")) setTimeout(loadMemories, 4000);
+  } catch (err) {
+    row.remove();
+    addRow("ai", esc(err.message.startsWith("The model is busy") ? err.message : `Something went wrong: ${err.message}`), { error: true });
+  } finally {
+    busy = false; $("send").disabled = false; $("input").focus();
+  }
+}
+
+/* ---------- memories ---------- */
+
+function editorHtml(m = {}) {
+  const cat = m.category || "other", imp = m.importance ?? 0.6;
+  return `
+    <textarea data-f="text" placeholder="e.g. The user's sister is called Asha." aria-label="Memory text">${esc(m.text || "")}</textarea>
+    <div class="line">
+      <label>Category <select data-f="category">${CATS.map((c) => `<option ${c === cat ? "selected" : ""}>${c}</option>`).join("")}</select></label>
+      <label>Importance <input data-f="importance" type="range" min="0" max="1" step="0.1" value="${imp}"> <output>${Number(imp).toFixed(1)}</output></label>
+    </div>
+    <div class="end"><button type="button" class="btn small" data-act="cancel">Cancel</button><button type="button" class="btn small primary" data-act="save">Save</button></div>`;
+}
+function readEditor(el) {
+  return { text: el.querySelector('[data-f="text"]').value.trim(), category: el.querySelector('[data-f="category"]').value, importance: parseFloat(el.querySelector('[data-f="importance"]').value) };
+}
+function wireRange(el) { const r = el.querySelector("input[type=range]"); r.oninput = () => { r.nextElementSibling.textContent = Number(r.value).toFixed(1); }; }
+
+$("memAdd").onclick = () => {
+  const f = $("addForm");
+  if (!f.hidden) { f.hidden = true; return; }
+  f.innerHTML = editorHtml(); f.hidden = false; wireRange(f);
+  f.querySelector("textarea").focus();
+  f.querySelector('[data-act="cancel"]').onclick = () => { f.hidden = true; };
+  f.querySelector('[data-act="save"]').onclick = async () => {
+    const body = readEditor(f);
+    if (body.text.length < 3) { f.querySelector("textarea").focus(); return; }
+    await fetch(`/users/${user()}/memories`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    f.hidden = true; loadMemories();
+  };
+};
+
+$("memExport").onclick = () => {
+  const blob = new Blob([JSON.stringify(memories, null, 2)], { type: "application/json" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `memories-${userId()}.json`; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+$("memSearch").oninput = renderMemories;
+
 async function loadMemories() {
-  const items = await (await fetch(`/users/${user()}/memories`)).json();
-  $("memCount").textContent = items.length ? `· ${items.length}` : "";
+  memories = await (await fetch(`/users/${user()}/memories`)).json();
+  renderMemories();
+}
+
+function renderMemories() {
+  $("memCount").textContent = memories.length ? `· ${memories.length}` : "";
+  const counts = Object.fromEntries(CATS.map((c) => [c, memories.filter((m) => m.category === c).length]));
+  $("memFilters").innerHTML = [["all", memories.length], ...CATS.map((c) => [c, counts[c]])]
+    .filter(([c, n]) => c === "all" || n)
+    .map(([c, n]) => `<button type="button" data-cat="${c}" aria-pressed="${memFilter === c}">${c} ${n}</button>`).join("");
+  $("memFilters").querySelectorAll("button").forEach((b) => b.onclick = () => { memFilter = b.dataset.cat; renderMemories(); });
+
+  const q = $("memSearch").value.trim().toLowerCase();
+  const shown = memories.filter((m) => (memFilter === "all" || m.category === memFilter) && (!q || m.text.toLowerCase().includes(q)));
   const list = $("memList");
-  if (!items.length) { list.innerHTML = `<p class="empty">Nothing yet. Tell the assistant something about yourself.</p>`; return; }
-  list.innerHTML = items.map((m) => `
-    <div class="card"><div class="row2">
-      <span class="txt">${esc(m.text)}</span>
-      <span style="display:flex;gap:8px;align-items:center"><span class="tag" style="background:${catColor(m.category)}">${esc(m.category)}</span>
-      <button class="del" title="Forget this" aria-label="Forget this memory" data-id="${m.id}">×</button></span>
-    </div></div>`).join("");
-  list.querySelectorAll(".del").forEach((b) => b.onclick = async () => {
-    await fetch(`/users/${user()}/memories/${b.dataset.id}`, { method: "DELETE" });
-    loadMemories();
+  if (!memories.length) { list.innerHTML = `<p class="empty">Nothing yet. Tell the assistant something about yourself, or add a memory.</p>`; return; }
+  if (!shown.length) { list.innerHTML = `<p class="empty">No memories match.</p>`; return; }
+  list.innerHTML = shown.map((m) => `
+    <div class="card" data-id="${m.id}">
+      <div class="row2">
+        <span class="txt">${esc(m.text)}</span>
+        <span class="actions"><span class="tag" style="background:${catColor(m.category)}">${esc(m.category)}</span>
+          <button class="icon" data-act="edit" title="Edit" aria-label="Edit memory">✎</button>
+          <button class="icon del" data-act="del" title="Forget" aria-label="Forget memory">×</button></span>
+      </div>
+      <div class="scores"><span>importance ${Number(m.importance).toFixed(1)}</span><span>${ago(m.updated_at)}</span></div>
+    </div>`).join("");
+  list.querySelectorAll(".card").forEach((card) => {
+    const m = memories.find((x) => x.id === card.dataset.id);
+    card.querySelector('[data-act="del"]').onclick = async () => {
+      await fetch(`/users/${user()}/memories/${m.id}`, { method: "DELETE" }); loadMemories();
+    };
+    card.querySelector('[data-act="edit"]').onclick = () => {
+      card.classList.add("editor"); card.innerHTML = editorHtml(m); wireRange(card);
+      card.querySelector('[data-act="cancel"]').onclick = renderMemories;
+      card.querySelector('[data-act="save"]').onclick = async () => {
+        const body = readEditor(card);
+        if (body.text.length < 3) return;
+        await fetch(`/users/${user()}/memories/${m.id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+        loadMemories();
+      };
+    };
   });
 }
+
+/* ---------- map and logs ---------- */
 
 async function loadMap() {
   mapPoints = await (await fetch(`/users/${user()}/memory-map`)).json();
@@ -292,7 +537,6 @@ async function loadMap() {
   if (!mapPoints.length) { ctx.fillStyle = css("--muted"); ctx.font = `14px ${css("--body")}`; ctx.fillText("No memories yet.", pad, pad + 8); return; }
   const xs = mapPoints.map((p) => p.x), ys = mapPoints.map((p) => p.y);
   const [x0, x1, y0, y1] = [Math.min(...xs), Math.max(...xs), Math.min(...ys), Math.max(...ys)];
-  ctx.font = `12px ${css("--mono")}`;
   mapPoints.forEach((p) => {
     p.px = x1 === x0 ? w / 2 : pad + ((p.x - x0) / (x1 - x0)) * (w - 2 * pad);
     p.py = y1 === y0 ? h / 2 : pad + ((p.y - y0) / (y1 - y0)) * (h - 2 * pad);
@@ -301,7 +545,6 @@ async function loadMap() {
     ctx.lineWidth = 2; ctx.strokeStyle = css("--surface-2"); ctx.stroke();
   });
 }
-
 $("map").addEventListener("mousemove", (e) => {
   const r = e.target.getBoundingClientRect();
   const hit = mapPoints.find((p) => Math.hypot(p.px - (e.clientX - r.left), p.py - (e.clientY - r.top)) < 10);
@@ -311,17 +554,18 @@ $("map").addEventListener("mousemove", (e) => {
 
 async function loadLogs() {
   const data = await (await fetch(`/users/${user()}/logs?limit=30`)).json();
-  const lat = data.items.map((l) => l.latency_ms).sort((a, b) => a - b);
-  const median = lat.length ? lat[Math.floor((lat.length - 1) / 2)] : 0;
-  const recalled = data.items.filter((l) => l.recalled.length).length;
+  const med = (xs) => { const s = xs.filter((x) => x != null).sort((a, b) => a - b); return s.length ? s[Math.floor((s.length - 1) / 2)] : null; };
+  const reply = med(data.items.map((l) => l.latency_ms)), first = med(data.items.map((l) => l.first_token_ms));
+  const toolUses = data.items.reduce((n, l) => n + (l.tools || []).length, 0);
   $("logStats").innerHTML = `
     <div class="tile"><b>${data.stats.turns}</b><span>turns</span></div>
-    <div class="tile"><b>${lat.length ? fmtMs(median) : "–"}</b><span>median reply</span></div>
-    <div class="tile"><b>${recalled}</b><span>used memory</span></div>`;
+    <div class="tile"><b>${reply == null ? "–" : fmtMs(reply)}</b><span>median reply</span></div>
+    <div class="tile"><b>${first == null ? "–" : fmtMs(first)}</b><span>median first word</span></div>
+    <div class="tile"><b>${toolUses}</b><span>memory tool uses</span></div>`;
   $("logList").innerHTML = data.items.map((l) => `
     <div class="card log">
       <q>${esc(l.user_message)}</q>
-      <div class="scores"><span>${new Date(l.ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span><span>${esc(l.thread_id)}</span><span>${fmtMs(l.latency_ms)}</span><span>recalled ${l.recalled.length}</span><span>stored ${l.stored.length}</span></div>
+      <div class="scores"><span>${new Date(l.ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span><span>${fmtMs(l.latency_ms)}</span><span>recalled ${l.recalled.length}</span><span>stored ${l.stored.length}</span>${(l.tools || []).length ? `<span>tools ${l.tools.length}</span>` : ""}</div>
     </div>`).join("") || `<p class="empty">No turns yet.</p>`;
 }
 
@@ -334,48 +578,26 @@ function showTab(name) {
 }
 document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => showTab(b.dataset.tab));
 
-$("newThread").onclick = () => {
-  $("threadId").value = `chat-${Math.random().toString(36).slice(2, 6)}`;
-  welcome();
-  $("recallList").innerHTML = `<p class="empty">New conversation. Long-term memories still carry over.</p>`;
-  $("input").focus();
-};
+/* ---------- wiring ---------- */
+
+function openDrawer() { $("chats").classList.add("open"); $("chatsToggle").setAttribute("aria-expanded", "true"); const s = document.createElement("div"); s.className = "scrim"; s.id = "scrim"; s.onclick = closeDrawer; document.body.appendChild(s); }
+function closeDrawer() { $("chats").classList.remove("open"); $("chatsToggle").setAttribute("aria-expanded", "false"); $("scrim")?.remove(); }
+$("chatsToggle").onclick = () => ($("chats").classList.contains("open") ? closeDrawer() : openDrawer());
+$("newChat").onclick = startNewChat;
+$("userId").addEventListener("change", () => { startNewChat(); memories = []; if ($("pane-memories").classList.contains("active")) loadMemories(); });
 
 function autosize() { const t = $("input"); t.style.height = "auto"; t.style.height = Math.min(t.scrollHeight, 160) + "px"; }
 $("input").addEventListener("input", autosize);
-
-$("form").addEventListener("submit", async (e) => {
+$("form").addEventListener("submit", (e) => {
   e.preventDefault();
   const text = $("input").value.trim();
-  if (!text) return;
-  $("input").value = ""; autosize(); $("send").disabled = true;
-  addRow("user", esc(text).replace(/\n/g, "<br>"));
-  const pending = addRow("ai", `<span class="typing" aria-label="Thinking"><i></i><i></i><i></i></span>`);
-  try {
-    const res = await fetch("/chat", {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ user_id: userId(), thread_id: $("threadId").value.trim() || "main", message: text, use_memory: $("useMemory").checked }),
-    });
-    if (!res.ok) {
-      let detail = `Server returned ${res.status}`;
-      try { detail = (await res.json()).detail || detail; } catch (_) {}
-      throw new Error(detail);
-    }
-    const data = await res.json();
-    pending.remove();
-    addReply(data);
-    renderRecall(data.recalled);
-    if ($("pane-memories").classList.contains("active")) setTimeout(loadMemories, 4000);
-  } catch (err) {
-    pending.remove();
-    addRow("ai", esc(err.message.startsWith("The model is busy") ? err.message : `Something went wrong: ${err.message}`), { error: true });
-  } finally {
-    $("send").disabled = false; $("input").focus();
-  }
+  if (!text || busy) return;
+  $("input").value = ""; autosize();
+  send(text);
 });
 $("input").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("form").requestSubmit(); } });
 
-welcome();
+openChat(threadId);
 </script>
 </body>
 </html>
