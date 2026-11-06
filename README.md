@@ -77,7 +77,7 @@ cp .env.example .env        # add your OPENAI_API_KEY (or switch provider)
 uvicorn app.api:app --reload
 ```
 
-Open http://localhost:8000. Tell it a few things about yourself, change the **thread** box to start a fresh conversation, and ask about them. The side panel shows:
+Open http://localhost:8000. For starting, stopping, updating and fixing common problems later, see [USAGE.md](USAGE.md). Tell it a few things about yourself, change the **thread** box to start a fresh conversation, and ask about them. The side panel shows:
 
 - **Recalled**: the memories used for the last reply, with similarity and final score
 - **Memories**: everything stored for this user, with a button to forget any item
