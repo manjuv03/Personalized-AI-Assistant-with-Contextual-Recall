@@ -31,6 +31,15 @@ TRANSIENT_MARKERS = (
     "timed out",
     "temporarily",
     "try again",
+    # Dropped or reset connections (e.g. httpx RemoteProtocolError, ConnectError, ReadError)
+    "disconnected",
+    "remoteprotocolerror",
+    "connecterror",
+    "connectionerror",
+    "connection reset",
+    "connection aborted",
+    "readerror",
+    "server closed",
 )
 
 

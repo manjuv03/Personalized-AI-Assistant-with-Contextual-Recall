@@ -46,6 +46,10 @@ def test_does_not_retry_real_errors():
 
 
 def test_transient_detection():
+    class RemoteProtocolError(Exception):
+        pass
+
+    assert is_transient(RemoteProtocolError("Server disconnected without sending a response."))
     assert is_transient(RuntimeError("429 RESOURCE_EXHAUSTED quota exceeded"))
     assert not is_transient(RuntimeError("404 model not found"))
 

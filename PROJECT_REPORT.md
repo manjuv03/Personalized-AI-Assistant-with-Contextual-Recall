@@ -258,7 +258,7 @@ While testing on Gemini's free tier, I hit "503: this model is currently experie
 flowchart TD
     A["Call the model"] --> B{"Error?"}
     B -- no --> Z([Return reply])
-    B -- yes --> C{"Busy or rate-limited?<br/>503, 429, quota, timeout"}
+    B -- yes --> C{"Temporary problem?<br/>503, 429, quota, timeout,<br/>dropped connection"}
     C -- "no, e.g. bad key" --> X([Fail straight away<br/>with the real error])
     C -- yes --> D{"Retries left?<br/>(default 4)"}
     D -- yes --> E["Wait 1.5 s, 3 s, 6 s, 12 s...<br/>with a little random jitter"] --> A
@@ -384,7 +384,7 @@ Model: Gemini 3.8 Flash. Embeddings: all-MiniLM-L6-v2. Personas: 8. Probes: 20.
 | Problem | What happened | Fix / lesson |
 |---|---|---|
 | Python version | On Python 3.15, numpy and LangGraph wouldn't install, so tests failed or were skipped | Rebuilt the environment on Python 3.12. Check that dependencies support your Python version before upgrading. |
-| Model overload | Gemini returned "503 high demand" and one reply took about 88 seconds | Added retries with backoff and a clear busy message, plus speed settings. Hosted models need resilience built in. |
+| Model overload | Gemini returned "503 high demand", one reply took about 88 seconds, and once the server dropped the connection mid-request | Added retries with backoff and a clear busy message, plus speed settings. Hosted models need resilience built in. |
 | Reply format | Gemini 3 returns content as a list of blocks with signatures, which showed up raw in the UI | A small helper keeps only the text parts. Don't assume every provider returns a plain string. |
 | Messy model output | Fact extraction sometimes wraps JSON in code fences or adds text | A tolerant parser that never crashes on bad output |
 | Measuring honestly | "Better continuity" means nothing without a baseline | The evaluation always runs the same questions with memory off as well |
