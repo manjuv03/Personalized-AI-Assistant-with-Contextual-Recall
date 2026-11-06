@@ -109,7 +109,7 @@ flowchart LR
     A[Message] --> C{Memory on?}
     C -- yes --> D[Recall + rank] --> E[Respond]
     C -- no --> E
-    E --> F{"Over 8 msgs?"}
+    E --> F{"16+ msgs?"}
     F -- yes --> G[Summarise] --> H[Reply]
     F -- no --> H
     H -.-> I[Extract facts] --> J{Duplicate?}
@@ -188,13 +188,13 @@ The weather remark is slightly closer in meaning, but the name wins because it m
 
 ```mermaid
 flowchart LR
-    A[10 messages] --> B{"Over 8?"}
+    A[Thread] --> B{"16+ msgs?"}
     B -- no --> F[Keep all]
-    B -- yes --> C[Oldest 2] --> D[Update summary]
+    B -- yes --> C[Oldest 8] --> D[Update summary]
     B -- yes --> E[Newest 8 kept]
 ```
 
-The prompt then holds the summary plus the last 8 messages, whatever the length of the conversation. Long-term facts don't depend on this, because they live in Chroma.
+Summarising waits until the thread holds 16 messages, then trims it back to the newest 8. That costs one extra model call every 4 turns rather than one on every turn, and the prompt never holds more than the summary plus 16 messages, however long the conversation gets. Long-term facts don't depend on this, because they live in Chroma.
 
 ---
 
@@ -222,7 +222,7 @@ flowchart LR
 | Technique | Effect |
 |---|---|
 | Fact extraction in a background task | The user waits for one model call, not two |
-| Rolling summary | The prompt stays the same size however long the chat gets |
+| Rolling summary in batches | The prompt stays small, and the extra summary call happens once every 4 turns, not every turn |
 | Low Gemini 3 thinking level | Answers start much sooner |
 | Reply length cap (1024 tokens) | Stops very long, slow answers |
 | Warm-up at start-up | The embedding model and Chroma load before the first message |
@@ -264,7 +264,7 @@ The tests run offline. They use an in-memory vector store, hashing embeddings an
 | Long-term memory | Relevant fact is recalled; users are isolated; near-duplicates update instead of adding; delete only works for the owner; unknown categories fall back |
 | Ranking | Recency halves after 30 days; importance breaks ties |
 | Extraction parsing | Code fences, out-of-range importance, garbage and empty output, plain strings |
-| Short-term memory | Summary split keeps the recent window; nothing is summarised until it's full |
+| Short-term memory | Summary split keeps the recent window; short threads aren't summarised |
 | Agent end-to-end | A fact told in one thread is recalled in another; memory can be switched off; long threads get summarised |
 | Retries | Busy errors are retried, real errors are not, and the app gives up cleanly |
 | Other | Interaction log round trip; keyword matching; Gemini content blocks; `.env` inline comments |
@@ -306,7 +306,7 @@ python -m eval.run_eval --runs 3 --delay 4
 - Facts are extracted in the background, stored in Chroma DB and kept between restarts.
 - Conversations are summarised once they pass the recent-message window.
 - Busy and rate-limit errors are retried and reported clearly.
-- All 24 tests pass on Python 3.12, and they run on every push through GitHub Actions.
+- All 25 tests pass on Python 3.12, and they run on every push through GitHub Actions.
 
 ### Results
 

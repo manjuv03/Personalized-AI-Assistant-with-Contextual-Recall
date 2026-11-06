@@ -53,8 +53,14 @@ def test_memory_can_be_switched_off(assistant):
     assert result.recalled == []
 
 
+def test_short_threads_are_not_summarised(assistant):
+    for i in range(3):  # 6 messages, below the trigger of 2 x 4
+        assistant.chat("u1", "t1", f"message {i}")
+    assert assistant.summary("u1", "t1") == ""
+
+
 def test_long_threads_are_summarised(assistant):
-    for i in range(4):
+    for i in range(4):  # 8 messages reaches the trigger, trimmed back to 4
         assistant.chat("u1", "t1", f"message {i}")
     assert assistant.summary("u1", "t1") == "Earlier the user chatted about the weather."
     state = assistant.graph.get_state({"configurable": {"thread_id": "u1:t1"}})

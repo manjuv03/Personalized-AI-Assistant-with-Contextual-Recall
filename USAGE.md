@@ -55,7 +55,7 @@ Results go to `eval/results.md`. `--delay 4` waits 4 seconds between model calls
 | `GOOGLE_API_KEY` / `OPENAI_API_KEY` | Your key for that provider. Never commit or share it. |
 | `LLM_MAX_RETRIES` | Retries when the model is busy (default 4) |
 | `EMBEDDING_PROVIDER` | `huggingface` (local, free) or `gemini` / `openai` (hosted, smaller install) |
-| `KEEP_RECENT_MESSAGES` | Messages kept word for word before older ones are summarised |
+| `KEEP_RECENT_MESSAGES` | Messages kept word for word; older ones are summarised once the thread reaches twice this |
 
 Restart the server after editing `.env`.
 

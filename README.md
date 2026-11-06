@@ -29,7 +29,7 @@ There are two kinds of memory:
 | What | Durable facts about the user | The current conversation |
 | Where | Chroma DB, one collection, filtered by `user_id` | LangGraph checkpointer, per thread |
 | Written | After each reply, in the background: an LLM pulls facts out of the user's message | Every turn |
-| Kept small by | De-duplication: a near-identical fact (cosine ≥ 0.92) updates the old one instead of adding a new one | Once a thread passes `KEEP_RECENT_MESSAGES`, older turns are folded into a running summary and removed |
+| Kept small by | De-duplication: a near-identical fact (cosine ≥ 0.92) updates the old one instead of adding a new one | Once a thread reaches twice `KEEP_RECENT_MESSAGES`, older turns are folded into a running summary and the thread is trimmed back |
 | Used | Top-k facts are added to the system prompt | Summary + recent messages go to the model |
 
 **Ranking recalled memories.** Chroma returns the closest facts by cosine similarity. I over-fetch and re-rank them with

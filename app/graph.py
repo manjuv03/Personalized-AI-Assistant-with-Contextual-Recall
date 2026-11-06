@@ -1,11 +1,12 @@
 """The LangGraph agent.
 
-    START -> recall -> respond --(conversation too long?)--> summarise -> END
+    START -> recall -> respond --(thread too long?)--> summarise -> END
                                 \\-----------------------------------------> END
 
 recall    searches the user's long-term memory (Chroma DB) with the new message
 respond   answers using recalled facts + the running summary + recent messages
 summarise folds older messages into the summary so the prompt stays small
+          (runs once the thread reaches 2 x KEEP_RECENT_MESSAGES)
 
 Writing new facts to long-term memory happens outside the graph (see
 service.py), so it never slows down the reply.
@@ -64,8 +65,13 @@ def build_graph(memory: LongTermMemory, chat_model, keep_recent_messages: int = 
         reply = chat_model.invoke(prompt)
         return {"messages": [reply]}
 
+    # Summarise in batches: wait until the thread holds twice the recent window,
+    # then trim back to the window. That's one extra model call every few turns
+    # instead of one on every turn.
+    summary_trigger = keep_recent_messages * 2
+
     def needs_summary(state: AgentState) -> str:
-        return "summarise" if len(state["messages"]) > keep_recent_messages else END
+        return "summarise" if len(state["messages"]) >= summary_trigger else END
 
     def summarise(state: AgentState) -> dict:
         old, _ = split_for_summary(state["messages"], keep_recent_messages)
