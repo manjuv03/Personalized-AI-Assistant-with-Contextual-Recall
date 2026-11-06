@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from typing import Sequence, TypeVar
 
+from ..llm import message_text
+
 T = TypeVar("T")
 
 SUMMARY_PROMPT = """Summarise this conversation between a user and their assistant so it can
@@ -36,7 +38,7 @@ def format_transcript(messages) -> str:
     lines = []
     for m in messages:
         role = {"human": "User", "ai": "Assistant"}.get(getattr(m, "type", ""), "Message")
-        lines.append(f"{role}: {getattr(m, 'content', m)}")
+        lines.append(f"{role}: {message_text(m)}")
     return "\n".join(lines)
 
 

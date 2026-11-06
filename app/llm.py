@@ -10,6 +10,26 @@ from typing import Protocol
 from .config import Settings
 
 
+def message_text(message) -> str:
+    """Plain text of a model reply.
+
+    Some providers (e.g. Gemini) return content as a list of blocks such as
+    [{"type": "text", "text": "..."}, {"type": "thinking", ...}]. Keep only the text parts.
+    """
+    content = getattr(message, "content", message)
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for part in content:
+            if isinstance(part, str):
+                parts.append(part)
+            elif isinstance(part, dict) and part.get("type", "text") == "text":
+                parts.append(str(part.get("text", "")))
+        return "".join(parts)
+    return str(content)
+
+
 class Embedder(Protocol):
     def embed_documents(self, texts: list[str]) -> list[list[float]]: ...
     def embed_query(self, text: str) -> list[float]: ...

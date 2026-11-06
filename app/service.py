@@ -10,7 +10,7 @@ from langchain_core.messages import HumanMessage
 
 from .config import Settings, settings as default_settings
 from .graph import build_graph
-from .llm import get_chat_model, get_embeddings
+from .llm import get_chat_model, get_embeddings, message_text
 from .logs import InteractionLog
 from .memory.extractor import extract_facts
 from .memory.long_term import LongTermMemory, build_long_term_memory
@@ -47,7 +47,7 @@ class Assistant:
         start = time.perf_counter()
         state = self.graph.invoke({"messages": [HumanMessage(content=message)]}, config)
         latency_ms = (time.perf_counter() - start) * 1000
-        reply = str(state["messages"][-1].content)
+        reply = message_text(state["messages"][-1])
         recalled = state.get("recalled", [])
         log_id = self.log.add(user_id, thread_id, message, reply, recalled, latency_ms)
         return ChatResult(reply=reply, recalled=recalled, latency_ms=latency_ms, log_id=log_id)

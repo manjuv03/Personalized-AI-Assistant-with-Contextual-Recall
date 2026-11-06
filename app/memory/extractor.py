@@ -65,8 +65,7 @@ def parse_extracted_facts(raw: str) -> list[dict]:
 
 
 def extract_facts(chat_model, message: str) -> list[dict]:
+    from ..llm import message_text
+
     reply = chat_model.invoke(build_extraction_prompt(message))
-    content = getattr(reply, "content", reply)
-    if isinstance(content, list):  # some providers return content blocks
-        content = "".join(part.get("text", "") if isinstance(part, dict) else str(part) for part in content)
-    return parse_extracted_facts(str(content))
+    return parse_extracted_facts(message_text(reply))

@@ -117,3 +117,13 @@ def test_contains_any_whole_words_and_prefix():
     assert contains_any("You write in Go.", ["go"])
     assert not contains_any("That sounds good", ["go"])
     assert contains_any("You're allergic to peanuts", ["allerg*"])
+
+
+def test_message_text_handles_content_blocks():
+    from app.llm import message_text
+
+    class Msg:
+        content = [{"type": "thinking", "thinking": "hmm"}, {"type": "text", "text": "Hi "}, "Manju", {"type": "text", "text": "!", "extras": {"signature": "abc"}}]
+
+    assert message_text(Msg()) == "Hi Manju!"
+    assert message_text("plain") == "plain"

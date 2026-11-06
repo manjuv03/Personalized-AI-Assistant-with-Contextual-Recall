@@ -21,6 +21,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
+from .llm import message_text
 from .memory.long_term import LongTermMemory
 from .memory.short_term import build_summary_prompt, split_for_summary
 
@@ -72,7 +73,7 @@ def build_graph(memory: LongTermMemory, chat_model, keep_recent_messages: int = 
             return {}
         reply = chat_model.invoke(build_summary_prompt(state.get("summary", ""), old))
         return {
-            "summary": str(reply.content).strip(),
+            "summary": message_text(reply).strip(),
             "messages": [RemoveMessage(id=m.id) for m in old],
         }
 
