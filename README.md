@@ -13,6 +13,14 @@ Most chatbots forget you the moment a conversation ends, or they stuff the whole
 - keeps each conversation short enough to stay fast, and
 - makes its memory visible, so you can see and correct what it knows.
 
+## Documentation
+
+| Document | For |
+|---|---|
+| [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) | Learning the concepts, technologies and code, step by step |
+| [PROJECT_REPORT.md](PROJECT_REPORT.md) | Why it was built, design, results and lessons |
+| [USAGE.md](USAGE.md) | Running, updating and troubleshooting on macOS |
+
 ## How it works
 
 ```mermaid
@@ -90,7 +98,7 @@ LLM_MODEL=gemini-3.8-flash
 GOOGLE_API_KEY=your-key
 ```
 
-Open http://localhost:8000. For starting, stopping, updating and fixing common problems later, see [USAGE.md](USAGE.md). For the full write-up of why and how this was built, see [PROJECT_REPORT.md](PROJECT_REPORT.md). Tell it a few things about yourself, change the **thread** box to start a fresh conversation, and ask about them. The side panel shows:
+Open http://localhost:8000. For starting, stopping, updating and fixing common problems later, see [USAGE.md](USAGE.md). For the full write-up of why and how this was built, see [PROJECT_REPORT.md](PROJECT_REPORT.md). To understand the code well enough to build it yourself, see [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md). Tell it a few things about yourself, change the **thread** box to start a fresh conversation, and ask about them. The side panel shows:
 
 - **Recalled**: the memories used for the last reply, with similarity and final score
 - **Memories**: everything stored for this user, with a button to forget any item
