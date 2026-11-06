@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -16,7 +17,12 @@ def _load_dotenv(path: Path) -> None:
         if not line or line.startswith("#") or "=" not in line:
             continue
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+        value = value.strip()
+        if value[:1] in "\"'" and value[:1] and value.count(value[0]) >= 2:
+            value = value[1 : value.index(value[0], 1)]  # quoted value, keep as is
+        else:
+            value = re.split(r"\s+#", value, maxsplit=1)[0].strip()  # drop inline comment
+        os.environ.setdefault(key.strip(), value)
 
 
 _load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -32,6 +38,8 @@ class Settings:
     llm_provider: str = field(default_factory=lambda: _env("LLM_PROVIDER", "openai"))
     llm_model: str = field(default_factory=lambda: _env("LLM_MODEL", "gpt-4o-mini"))
     llm_temperature: float = field(default_factory=lambda: float(_env("LLM_TEMPERATURE", "0.3")))
+    # Retries when the provider is busy (503) or rate-limiting (429).
+    llm_max_retries: int = field(default_factory=lambda: int(_env("LLM_MAX_RETRIES", "4")))
 
     # Embeddings: "openai", "gemini", "huggingface" or "hash" (offline, for tests/demos).
     embedding_provider: str = field(default_factory=lambda: _env("EMBEDDING_PROVIDER", "huggingface"))

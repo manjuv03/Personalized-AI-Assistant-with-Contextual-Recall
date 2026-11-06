@@ -42,6 +42,8 @@ where recency halves every 30 days. Similarity matters most; importance and rece
 
 **Corrections.** If the user says "actually, my coffee shop is called Ember & Oak now", the new fact is close enough to the old one to replace it, and the system prompt tells the model to trust what the user says now over older memories.
 
+**Busy models.** Hosted models sometimes reply "503 high demand" or "429 quota". Every model call retries those with exponential backoff (`LLM_MAX_RETRIES`, default 4). If the model is still busy, the API returns a 503 with a clear message and the UI shows "The model is busy right now", rather than a generic server error. Other errors, like a bad key, fail straight away.
+
 **Latency.** Fact extraction is a second LLM call, so it runs as a FastAPI background task after the reply is sent. The user only waits for recall + one model call (plus a summary call every few turns on long threads).
 
 ## Project structure
@@ -108,7 +110,10 @@ For each persona in `eval/scenarios.json`, the assistant is told some facts in o
 
 ```bash
 python -m eval.run_eval --runs 3
+python -m eval.run_eval --delay 4   # on a free tier: wait 4 s between model calls
 ```
+
+Probes that can't run because the model stays busy are skipped and counted, not scored as failures.
 
 Results are written to `eval/results.md` (continuity with vs without memory, mean and p95 latency, and any failed probes) and `eval/results.json` (every reply). Latency depends heavily on the chat model and network, so the recall step is reported separately from the model call.
 

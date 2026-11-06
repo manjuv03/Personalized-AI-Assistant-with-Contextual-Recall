@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass, field
 
@@ -13,6 +14,8 @@ from .llm import get_chat_model, get_embeddings
 from .logs import InteractionLog
 from .memory.extractor import extract_facts
 from .memory.long_term import LongTermMemory, build_long_term_memory
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -58,6 +61,14 @@ class Assistant:
         if log_id is not None:
             self.log.set_stored(log_id, stored)
         return stored
+
+    def remember_safely(self, user_id: str, message: str, log_id: int | None = None) -> list[dict]:
+        """Background version of remember(): a failure is logged instead of raised."""
+        try:
+            return self.remember(user_id, message, log_id)
+        except Exception:  # noqa: BLE001
+            log.exception("Could not save memories for this message")
+            return []
 
     def summary(self, user_id: str, thread_id: str) -> str:
         config = {"configurable": {"thread_id": f"{user_id}:{thread_id}"}}

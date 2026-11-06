@@ -22,6 +22,7 @@ from pathlib import Path
 
 from app.config import settings
 from app.logs import InteractionLog
+from app.retry import ModelBusyError
 from app.service import Assistant
 
 from .metrics import contains_any, latency_summary
@@ -29,7 +30,7 @@ from .metrics import contains_any, latency_summary
 HERE = Path(__file__).parent
 
 
-def run(runs: int, scenario_path: Path) -> dict:
+def run(runs: int, scenario_path: Path, delay: float = 0.0) -> dict:
     scenarios = json.loads(scenario_path.read_text(encoding="utf-8"))
     eval_settings = replace(settings, chroma_collection=f"{settings.chroma_collection}_eval")
     assistant = Assistant(eval_settings, log=InteractionLog(":memory:"))
@@ -37,21 +38,40 @@ def run(runs: int, scenario_path: Path) -> dict:
     cases = []
     chat_ms = {"memory": [], "baseline": []}
     recall_ms = []
+    skipped = []  # probes that could not run because the model stayed busy
+
+    def pause():
+        if delay:
+            time.sleep(delay)
 
     for run_no in range(runs):
         for sc in scenarios:
             user_id = f"eval-{sc['persona']}-{uuid.uuid4().hex[:6]}"
-            for msg in sc["teach"]:
-                assistant.chat(user_id, "teach", msg)
-                assistant.remember(user_id, msg)
+            try:
+                for msg in sc["teach"]:
+                    assistant.chat(user_id, "teach", msg)
+                    pause()
+                    assistant.remember(user_id, msg)
+                    pause()
+            except ModelBusyError:
+                print(f"  model busy while teaching {sc['persona']}; skipping this persona")
+                skipped.extend({"run": run_no + 1, "persona": sc["persona"], "question": p["question"]} for p in sc["probes"])
+                continue
 
             for probe in sc["probes"]:
                 t0 = time.perf_counter()
                 assistant.memory.recall(user_id, probe["question"])
                 recall_ms.append((time.perf_counter() - t0) * 1000)
 
-                with_mem = assistant.chat(user_id, "probe", probe["question"], use_memory=True)
-                without = assistant.chat(user_id, "baseline", probe["question"], use_memory=False)
+                try:
+                    with_mem = assistant.chat(user_id, "probe", probe["question"], use_memory=True)
+                    pause()
+                    without = assistant.chat(user_id, "baseline", probe["question"], use_memory=False)
+                    pause()
+                except ModelBusyError:
+                    print(f"  model busy on '{probe['question']}'; skipped")
+                    skipped.append({"run": run_no + 1, "persona": sc["persona"], "question": probe["question"]})
+                    continue
                 chat_ms["memory"].append(with_mem.latency_ms)
                 chat_ms["baseline"].append(without.latency_ms)
                 cases.append(
@@ -76,6 +96,7 @@ def run(runs: int, scenario_path: Path) -> dict:
             "vector_backend": settings.vector_backend,
             "runs": runs,
             "probes": n,
+            "skipped_busy": len(skipped),
         },
         "continuity": {
             "with_memory": round(mem_rate * 100, 1),
@@ -88,6 +109,7 @@ def run(runs: int, scenario_path: Path) -> dict:
             "chat_without_memory": latency_summary(chat_ms["baseline"]),
         },
         "cases": cases,
+        "skipped": skipped,
     }
 
 
@@ -96,7 +118,8 @@ def to_markdown(r: dict) -> str:
     lines = [
         "# Evaluation results",
         "",
-        f"LLM `{cfg['llm']}` · embeddings `{cfg['embeddings']}` · {cfg['probes']} probes over {cfg['runs']} run(s)",
+        f"LLM `{cfg['llm']}` · embeddings `{cfg['embeddings']}` · {cfg['probes']} probes over {cfg['runs']} run(s)"
+        + (f" · {cfg['skipped_busy']} skipped (model busy)" if cfg.get("skipped_busy") else ""),
         "",
         "| Metric | With memory | Without memory |",
         "|---|---|---|",
@@ -121,12 +144,15 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--runs", type=int, default=1)
     parser.add_argument("--scenarios", type=Path, default=HERE / "scenarios.json")
+    parser.add_argument("--delay", type=float, default=0.0, help="seconds to wait between model calls (helps on free tiers)")
     args = parser.parse_args()
 
-    results = run(args.runs, args.scenarios)
+    results = run(args.runs, args.scenarios, args.delay)
     (HERE / "results.json").write_text(json.dumps(results, indent=2), encoding="utf-8")
     (HERE / "results.md").write_text(to_markdown(results), encoding="utf-8")
     c = results["continuity"]
+    if results["skipped"]:
+        print(f"Skipped {len(results['skipped'])} probe(s) because the model stayed busy. Re-run later or add --delay 4.")
     print(f"Continuity: {c['with_memory']}% with memory vs {c['without_memory']}% without")
     print(f"Chat latency (with memory): {results['latency_ms']['chat_with_memory']}")
     print(f"Recall step only: {results['latency_ms']['recall_only']}")

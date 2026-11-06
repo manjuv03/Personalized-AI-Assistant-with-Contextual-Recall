@@ -2,20 +2,35 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import BackgroundTasks, Depends, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from .retry import ModelBusyError
 from .service import Assistant
+
+log = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
 app = FastAPI(title="Personalised AI Assistant with Contextual Recall", version="1.0.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+@app.exception_handler(ModelBusyError)
+def model_busy(_: Request, exc: ModelBusyError) -> JSONResponse:
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
+
+
+@app.exception_handler(Exception)
+def unexpected(_: Request, exc: Exception) -> JSONResponse:
+    log.exception("Unhandled error")
+    return JSONResponse(status_code=500, content={"detail": f"{type(exc).__name__}: {exc}"[:300]})
 
 
 @lru_cache(maxsize=1)
@@ -58,7 +73,7 @@ def chat(req: ChatRequest, background: BackgroundTasks, assistant: Assistant = D
     result = assistant.chat(req.user_id, req.thread_id, req.message, use_memory=req.use_memory)
     if req.use_memory:
         # Saving new facts happens after the reply is sent.
-        background.add_task(assistant.remember, req.user_id, req.message, result.log_id)
+        background.add_task(assistant.remember_safely, req.user_id, req.message, result.log_id)
     return ChatResponse(
         reply=result.reply, recalled=result.recalled, latency_ms=round(result.latency_ms, 1), log_id=result.log_id
     )

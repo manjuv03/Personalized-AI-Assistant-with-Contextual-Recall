@@ -207,12 +207,16 @@ $("form").addEventListener("submit", async (e) => {
       method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ user_id: $("userId").value.trim() || "demo", thread_id: $("threadId").value.trim() || "main", message: text, use_memory: $("useMemory").checked }),
     });
-    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    if (!res.ok) {
+      let detail = `Server returned ${res.status}`;
+      try { detail = (await res.json()).detail || detail; } catch (_) {}
+      throw new Error(detail);
+    }
     const data = await res.json();
     addMessage("ai", data.reply, data);
     renderRecall(data.recalled);
   } catch (err) {
-    addMessage("ai", `Something went wrong: ${err.message}`);
+    addMessage("ai", err.message.startsWith("The model is busy") ? err.message : `Something went wrong: ${err.message}`);
   } finally {
     $("send").disabled = false; $("input").focus();
   }

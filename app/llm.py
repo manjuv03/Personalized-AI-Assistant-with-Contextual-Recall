@@ -64,6 +64,13 @@ def get_embeddings(settings: Settings) -> Embedder:
 
 
 def get_chat_model(settings: Settings):
+    """The configured chat model, wrapped so busy/rate-limit errors are retried."""
+    from .retry import RetryingChatModel
+
+    return RetryingChatModel(_raw_chat_model(settings), max_retries=settings.llm_max_retries)
+
+
+def _raw_chat_model(settings: Settings):
     provider = settings.llm_provider.lower()
     if provider == "openai":
         from langchain_openai import ChatOpenAI
