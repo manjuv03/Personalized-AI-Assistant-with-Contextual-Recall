@@ -301,6 +301,8 @@ The recall step (embedding + Chroma search) runs locally and is reported separat
 | GET | `/users/{user_id}/threads/{thread_id}/summary` | A thread's running summary |
 | GET | `/users/{user_id}/logs` | Recent turns and average latency |
 
+![The assistant answering "What do you know about me?" in a new chat, with the memories it used on the right](assets/screenshots/app-overview.png)
+
 The web page has three columns:
 
 - **Chats:** saved conversations, newest first, with **+ New chat** and delete. On small screens it slides in from the side.
@@ -317,7 +319,7 @@ A **Memory** switch turns recall, saving and tools off, so you can compare answe
 
 ## 10. Testing
 
-The tests run offline. They use an in-memory vector store, hashing embeddings and scripted models (including scripted tool calls and a fake streaming model), so they need no network and no API key. GitHub Actions runs all 36 on every push, on Python 3.11 and 3.12.
+The tests run offline. They use an in-memory vector store, hashing embeddings and scripted models (including scripted tool calls and a fake streaming model), so they need no network and no API key. GitHub Actions runs all 37 on every push, on Python 3.11 and 3.12.
 
 | Area | What is checked |
 |---|---|
@@ -375,7 +377,7 @@ python -m eval.run_eval --runs 3 --delay 5
 - Replies stream word by word, and chats are saved and reopened after restarts.
 - Memories can be searched, filtered, added, edited, deleted and exported from the UI.
 - Busy and rate-limit errors are retried and reported clearly.
-- All 36 tests pass on Python 3.11 and 3.12, and they run on every push through GitHub Actions.
+- All 37 tests pass on Python 3.11 and 3.12, and they run on every push through GitHub Actions.
 
 ### Results
 
@@ -415,6 +417,7 @@ These numbers come from a small test set: 20 questions, one run, scored by keywo
 | Measuring honestly | "Better continuity" means nothing without a baseline | The evaluation always runs the same questions with memory off as well: 100% with memory vs 10% without |
 | Free-tier limits | Gemini 3.8 Flash allowed 5 requests a minute and 20 a day, and each message uses about 2 | Switched to Gemini 3.5 Flash Lite (15 a minute, 500 a day) and added a `--delay` option to the evaluation |
 | Tool calls and summaries | Trimming old messages could leave a tool result without the call that produced it, which chat APIs reject | The cut point always moves to a user message |
+| Saving the same fact twice | "Remember that I'm vegetarian and love South Indian food" was saved once by the tool and again, split into two facts, by background extraction; de-duplication didn't catch it because the wording differed | Background extraction is skipped when the model already used `save_memory` that turn |
 | Streaming the right text | The summary step also produces text, which shouldn't appear in the chat | Only chunks from the `respond` step are streamed |
 
 ---

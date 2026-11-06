@@ -25,6 +25,8 @@
 
 <sub>Gemini 3.5 Flash Lite · local MiniLM embeddings · 8 personas, 20 questions, each asked in a brand-new conversation. Measured before the memory tools and streaming were added. Small test set with keyword scoring; see the [report](PROJECT_REPORT.md#12-outcome).</sub>
 
+<p align="center"><img src="assets/screenshots/app-overview.png" alt="The assistant answering 'What do you know about me?' in a new chat, with the four memories it used listed on the right with their scores" width="100%"></p>
+
 ---
 
 ## What it does
@@ -39,6 +41,19 @@ Most chatbots either **forget you** when a conversation ends, or **send the whol
 - **Streams replies.** Text appears word by word, and the memories it used show up before the answer starts.
 - **Keeps your chats.** A sidebar lists past conversations, saved to disk, so you can reopen them after a restart.
 - **Shows and edits its memory.** The web UI shows the memories used for every reply, and lets you add, edit, search, filter, export or delete what it knows about you, plus a map of those memories and a log of every turn.
+
+### Screenshots
+
+<table>
+<tr>
+<td colspan="3"><img src="assets/screenshots/memory-tool.png" alt="Asked to remember a preference, the assistant saves it with a memory tool and shows a 'Saved' tag under the reply"><br><sub><b>Memory tools.</b> Asked to remember something, it saves the fact itself and says so under the reply.</sub></td>
+</tr>
+<tr>
+<td width="33%" valign="top"><img src="assets/screenshots/memories.png" alt="Memories panel with search, category filters, add, edit and delete"><br><sub><b>Memories.</b> Search, filter, add, edit, delete and export.</sub></td>
+<td width="33%" valign="top"><img src="assets/screenshots/memory-map.png" alt="Memory map with points coloured by category; food preferences sit together"><br><sub><b>Map.</b> Similar facts sit close together; the food preferences cluster on the right.</sub></td>
+<td width="33%" valign="top"><img src="assets/screenshots/logs.png" alt="Logs panel with turns, median reply time, median time to first word and memory tool uses"><br><sub><b>Logs.</b> Median reply 1.2 s, first word in under a second.</sub></td>
+</tr>
+</table>
 
 ---
 
@@ -270,7 +285,7 @@ USAGE.md              Running, updating and troubleshooting
 python -m pytest
 ```
 
-36 tests using an in-memory vector store, hashing embeddings and scripted models, so they need no network or key. They cover ranking, de-duplication, user isolation, editing memories, fact parsing, the memory tools (save, search then forget), streaming, saved chats, summarising without splitting tool calls, retries, upgrading old log databases, and an end-to-end check that a fact told in one conversation is recalled in another. GitHub Actions runs them on every push.
+37 tests using an in-memory vector store, hashing embeddings and scripted models, so they need no network or key. They cover ranking, de-duplication, user isolation, editing memories, fact parsing, the memory tools (save, search then forget), streaming, saved chats, summarising without splitting tool calls, retries, upgrading old log databases, and an end-to-end check that a fact told in one conversation is recalled in another. GitHub Actions runs them on every push.
 
 </details>
 

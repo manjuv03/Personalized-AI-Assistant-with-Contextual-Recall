@@ -96,7 +96,7 @@ def health() -> dict:
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest, background: BackgroundTasks, assistant: Assistant = Depends(get_assistant)):
     result = assistant.chat(req.user_id, req.thread_id, req.message, use_memory=req.use_memory)
-    if req.use_memory:
+    if req.use_memory and assistant.needs_extraction(result.tools):
         # Saving new facts happens after the reply is sent.
         background.add_task(assistant.remember_safely, req.user_id, req.message, result.log_id)
     return ChatResponse(
@@ -115,7 +115,7 @@ def chat_stream(req: ChatRequest, assistant: Assistant = Depends(get_assistant))
     def events():
         try:
             for event in assistant.chat_stream(req.user_id, req.thread_id, req.message, use_memory=req.use_memory):
-                if event["type"] == "done" and req.use_memory:
+                if event["type"] == "done" and req.use_memory and assistant.needs_extraction(event["tools"]):
                     threading.Thread(
                         target=assistant.remember_safely,
                         args=(req.user_id, req.message, event["log_id"]),

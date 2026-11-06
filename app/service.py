@@ -144,6 +144,15 @@ class Assistant:
             self.log.set_stored(log_id, stored)
         return stored
 
+    @staticmethod
+    def needs_extraction(tools: list[dict]) -> bool:
+        """Skip background extraction when the model already saved memories this turn.
+
+        Otherwise "Remember that I'm vegetarian and love South Indian food" is saved
+        once by the tool and again, split into two facts, by the extractor.
+        """
+        return not any(t.get("name") == "save_memory" for t in tools or [])
+
     def remember_safely(self, user_id: str, message: str, log_id: int | None = None) -> list[dict]:
         """Background version of remember(): a failure is logged instead of raised."""
         try:

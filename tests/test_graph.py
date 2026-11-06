@@ -159,3 +159,10 @@ def test_stream_sends_recall_tokens_and_done():
     assert done["reply"] == "Hello there, Priya!"
     assert done["first_token_ms"] is not None
     assert a.thread_history("u1", "t1")[0]["reply"] == "Hello there, Priya!"
+
+
+def test_no_double_saving_after_a_tool_save(assistant):
+    result = assistant.chat("u1", "t1", "Remember that my sister is called Asha.")
+    assert not assistant.needs_extraction(result.tools)
+    plain = assistant.chat("u1", "t1", "Hi, I'm Priya!")
+    assert assistant.needs_extraction(plain.tools)

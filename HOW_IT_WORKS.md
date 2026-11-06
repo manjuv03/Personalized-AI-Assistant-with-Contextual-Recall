@@ -238,7 +238,7 @@ sequenceDiagram
 4. The `tools` node runs `run_tool()` for the current user, adds the fact to Chroma, and returns a `ToolMessage` with the result plus a short label for the UI ("Saved: The user's sister is called Asha."). A `tools` event goes to the browser.
 5. The graph goes back to `respond`. Now the model answers in text, and each chunk becomes a `token` event. Chunks from the summary step are ignored, so only the answer streams.
 6. At the end, `chat_stream()` reads the final state, logs the turn (including the time to the first token and the tools used) and sends `done`.
-7. **`api.py`** turns each event into SSE text (`event: …` / `data: …`) inside a `StreamingResponse`. After `done`, it starts the background fact extraction in a separate thread.
+7. **`api.py`** turns each event into SSE text (`event: …` / `data: …`) inside a `StreamingResponse`. After `done`, it starts the background fact extraction in a separate thread, unless the model already used `save_memory` that turn (`needs_extraction()`), which would save the same facts twice.
 8. **The browser** reads the stream with `fetch()` and a reader, adds tokens to the bubble as they arrive, and shows the tool chips and timings when `done` arrives.
 
 ---

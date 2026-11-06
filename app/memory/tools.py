@@ -25,7 +25,8 @@ def search_memory(query: str) -> str:
 @tool
 def save_memory(text: str, category: str = "other", importance: float = 0.6) -> str:
     """Save a lasting fact about the user, mainly when they ask you to remember something.
-    Write one short third-person sentence, e.g. "The user's sister is called Asha."
+    Save one fact per call, as a short sentence starting with "The user",
+    e.g. "The user's sister is called Asha." or "The user is vegetarian."
     category is one of: profile, preference, goal, project, other. importance is 0 to 1."""
     return ""
 
@@ -41,7 +42,7 @@ TOOLS = [search_memory, save_memory, forget_memory]
 
 TOOL_GUIDE = """You can manage your memory of the user with tools:
 - search_memory: look up details you weren't given above.
-- save_memory: when the user asks you to remember something, save it as one short fact.
+- save_memory: when the user asks you to remember something, save each fact separately, starting with "The user".
 - forget_memory: when the user asks you to forget something or corrects a fact; search first to get the id.
 Don't use tools for small talk. After using a tool, tell the user briefly what you did."""
 
