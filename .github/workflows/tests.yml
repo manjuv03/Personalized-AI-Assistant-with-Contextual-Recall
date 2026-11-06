@@ -1,0 +1,22 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      # The tests use an in-memory vector store, hashing embeddings and a scripted
+      # model, so only the lightweight core packages are needed here.
+      - run: pip install "langchain-core>=0.3" "langgraph>=0.4" "numpy>=1.26" "pytest>=8.0"
+      - run: python -m pytest -q

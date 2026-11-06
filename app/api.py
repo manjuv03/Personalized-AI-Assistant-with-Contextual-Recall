@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import asynccontextmanager
 from functools import lru_cache
 from pathlib import Path
 
@@ -18,7 +19,23 @@ log = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).parent / "static"
 
-app = FastAPI(title="Personalised AI Assistant with Contextual Recall", version="1.0.0")
+
+@lru_cache(maxsize=1)
+def get_assistant() -> Assistant:
+    return Assistant()
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Load the embedding model and vector store at startup, so the first message isn't slow."""
+    try:
+        get_assistant().memory.embedder.embed_query("warm up")
+    except Exception:  # noqa: BLE001 - the app should still start; errors show on first use
+        log.exception("Warm-up failed")
+    yield
+
+
+app = FastAPI(title="Personalised AI Assistant with Contextual Recall", version="1.0.0", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -31,11 +48,6 @@ def model_busy(_: Request, exc: ModelBusyError) -> JSONResponse:
 def unexpected(_: Request, exc: Exception) -> JSONResponse:
     log.exception("Unhandled error")
     return JSONResponse(status_code=500, content={"detail": f"{type(exc).__name__}: {exc}"[:300]})
-
-
-@lru_cache(maxsize=1)
-def get_assistant() -> Assistant:
-    return Assistant()
 
 
 class ChatRequest(BaseModel):

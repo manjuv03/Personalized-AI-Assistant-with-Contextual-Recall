@@ -1,5 +1,7 @@
 # Personalised AI Assistant with Contextual Recall
 
+[![tests](https://github.com/manjuv03/Personalized-AI-Assistant-with-Contextual-Recall/actions/workflows/tests.yml/badge.svg)](https://github.com/manjuv03/Personalized-AI-Assistant-with-Contextual-Recall/actions/workflows/tests.yml)
+
 A conversational assistant that remembers the people it talks to. It is built with **LangChain** and **LangGraph**, keeps long-term facts about each user in **Chroma DB**, and keeps the current conversation compact with a running summary. A **FastAPI** backend serves the chat, the memory store, interaction logs and a small web UI that shows exactly which memories were used for every reply.
 
 ## Why
@@ -44,7 +46,12 @@ where recency halves every 30 days. Similarity matters most; importance and rece
 
 **Busy models.** Hosted models sometimes reply "503 high demand" or "429 quota". Every model call retries those with exponential backoff (`LLM_MAX_RETRIES`, default 4). If the model is still busy, the API returns a 503 with a clear message and the UI shows "The model is busy right now", rather than a generic server error. Other errors, like a bad key, fail straight away.
 
-**Latency.** Fact extraction is a second LLM call, so it runs as a FastAPI background task after the reply is sent. The user only waits for recall + one model call (plus a summary call every few turns on long threads).
+**Latency.** Fact extraction is a second LLM call, so it runs as a FastAPI background task after the reply is sent. The user only waits for recall + one model call (plus a summary call every few turns on long threads). On top of that:
+
+- replies are capped at `LLM_MAX_TOKENS` (default 1024),
+- Gemini 3 models run with a low thinking level (`LLM_THINKING_LEVEL=low`), which answers much faster,
+- the embedding model and Chroma DB load when the server starts, so the first message isn't slow,
+- requests that hang give up after `LLM_TIMEOUT` seconds and are retried.
 
 ## Project structure
 
@@ -70,14 +77,24 @@ tests/                Unit tests (run offline, no API key)
 
 ## Getting started
 
+Needs **Python 3.10 to 3.13** (some dependencies, like numpy and Chroma, don't ship builds for newer versions yet).
+
 ```bash
-python -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
+python3.12 -m venv .venv && source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-cp .env.example .env        # add your OPENAI_API_KEY (or switch provider)
+cp .env.example .env
 uvicorn app.api:app --reload
 ```
 
-Open http://localhost:8000. For starting, stopping, updating and fixing common problems later, see [USAGE.md](USAGE.md). Tell it a few things about yourself, change the **thread** box to start a fresh conversation, and ask about them. The side panel shows:
+In `.env`, either add an `OPENAI_API_KEY`, or use Gemini with a free key from [Google AI Studio](https://aistudio.google.com/apikey):
+
+```
+LLM_PROVIDER=gemini
+LLM_MODEL=gemini-3.8-flash
+GOOGLE_API_KEY=your-key
+```
+
+Open http://localhost:8000. For starting, stopping, updating and fixing common problems later, see [USAGE.md](USAGE.md). For the full write-up of why and how this was built, see [PROJECT_REPORT.md](PROJECT_REPORT.md). Tell it a few things about yourself, change the **thread** box to start a fresh conversation, and ask about them. The side panel shows:
 
 - **Recalled**: the memories used for the last reply, with similarity and final score
 - **Memories**: everything stored for this user, with a button to forget any item

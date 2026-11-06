@@ -40,6 +40,10 @@ class Settings:
     llm_temperature: float = field(default_factory=lambda: float(_env("LLM_TEMPERATURE", "0.3")))
     # Retries when the provider is busy (503) or rate-limiting (429).
     llm_max_retries: int = field(default_factory=lambda: int(_env("LLM_MAX_RETRIES", "4")))
+    # Speed: cap reply length, give up on a hung request, and keep Gemini 3 "thinking" low.
+    llm_max_tokens: int = field(default_factory=lambda: int(_env("LLM_MAX_TOKENS", "1024")))
+    llm_timeout: float = field(default_factory=lambda: float(_env("LLM_TIMEOUT", "60")))
+    llm_thinking_level: str = field(default_factory=lambda: _env("LLM_THINKING_LEVEL", "low"))
 
     # Embeddings: "openai", "gemini", "huggingface" or "hash" (offline, for tests/demos).
     embedding_provider: str = field(default_factory=lambda: _env("EMBEDDING_PROVIDER", "huggingface"))

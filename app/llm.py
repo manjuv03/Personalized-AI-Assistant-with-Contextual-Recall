@@ -92,16 +92,36 @@ def get_chat_model(settings: Settings):
 
 def _raw_chat_model(settings: Settings):
     provider = settings.llm_provider.lower()
+    max_tokens = settings.llm_max_tokens or None
     if provider == "openai":
         from langchain_openai import ChatOpenAI
 
-        return ChatOpenAI(model=settings.llm_model, temperature=settings.llm_temperature)
+        return ChatOpenAI(
+            model=settings.llm_model,
+            temperature=settings.llm_temperature,
+            max_tokens=max_tokens,
+            timeout=settings.llm_timeout,
+        )
     if provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
 
-        return ChatGoogleGenerativeAI(model=settings.llm_model, temperature=settings.llm_temperature)
+        base = dict(
+            model=settings.llm_model,
+            temperature=settings.llm_temperature,
+            max_output_tokens=max_tokens,
+            timeout=settings.llm_timeout,
+        )
+        # Gemini 3 models "think" before answering; a low level answers much faster.
+        # Older library versions may not know the option, so fall back without it.
+        level = settings.llm_thinking_level.strip().lower()
+        if level and level != "default":
+            try:
+                return ChatGoogleGenerativeAI(**base, thinking_level=level)
+            except Exception:  # noqa: BLE001
+                pass
+        return ChatGoogleGenerativeAI(**base)
     if provider == "ollama":
         from langchain_ollama import ChatOllama
 
-        return ChatOllama(model=settings.llm_model, temperature=settings.llm_temperature)
+        return ChatOllama(model=settings.llm_model, temperature=settings.llm_temperature, num_predict=max_tokens)
     raise ValueError(f"Unknown LLM_PROVIDER: {settings.llm_provider}")
