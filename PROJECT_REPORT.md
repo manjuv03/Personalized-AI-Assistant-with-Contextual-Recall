@@ -310,16 +310,26 @@ python -m eval.run_eval --runs 3 --delay 4
 
 ### Results
 
-<!-- Fill this table from eval/results.md after running the evaluation. -->
+Measured on a MacBook Air with Gemini 3.5 Flash Lite and local all-MiniLM-L6-v2 embeddings: 8 personas, 20 probe questions, 1 run (full output in [eval/results.md](eval/results.md)).
 
 | Metric | With memory | Without memory |
 |---|---|---|
-| Continuity (probes answered from earlier sessions) | *to be measured* | *to be measured* |
-| Mean response time | *to be measured* | *to be measured* |
-| p95 response time | *to be measured* | *to be measured* |
-| Recall step only (mean) | *to be measured* | n/a |
+| Continuity (probes answered from earlier sessions) | **100%** (20 / 20) | 10% (2 / 20) |
+| Mean response time | 941 ms | 865 ms |
+| Median response time | 768 ms | n/a |
+| p95 response time | 2,278 ms | 1,658 ms |
+| Recall step only | mean 150 ms, median 74 ms, p95 431 ms | n/a |
 
-Model: Gemini 3.8 Flash. Embeddings: all-MiniLM-L6-v2. Personas: 8. Probes: 20.
+**What this means**
+
+- **Memory is what makes the difference.** With memory on, the assistant answered every probe correctly in a brand-new conversation. With it off, it got 2 of 20, where a generic answer happened to contain an expected keyword. That's an improvement of 90 percentage points.
+- **Replies stay under a second on average.** The full turn, including the model call over the network, averages 941 ms, with half of all replies under 768 ms.
+- **Memory costs little time.** Turns with memory took about 77 ms longer on average than turns without. The recall step itself (embedding the question and searching Chroma DB) has a median of 74 ms; its mean is higher because the first searches warm up caches.
+- **Most of the time is the model.** Recall is a small share of each turn; the rest is the round trip to Gemini.
+
+**How much to trust it**
+
+These numbers come from a small test set: 20 questions, one run, scored by keyword matching. They show the method works, not that it would score 100% on any conversation. Running `--runs 5` (100 probes) and adding an LLM judge would make them stronger; both are listed as next steps.
 
 ---
 
@@ -331,7 +341,8 @@ Model: Gemini 3.8 Flash. Embeddings: all-MiniLM-L6-v2. Personas: 8. Probes: 20.
 | Model overload | Gemini returned "503 high demand", one reply took about 88 seconds, and once the server dropped the connection mid-request | Added retries with backoff and a clear busy message, plus speed settings. Hosted models need resilience built in. |
 | Reply format | Gemini 3 returns content as a list of blocks with signatures, which showed up raw in the UI | A small helper keeps only the text parts. Don't assume every provider returns a plain string. |
 | Messy model output | Fact extraction sometimes wraps JSON in code fences or adds text | A tolerant parser that never crashes on bad output |
-| Measuring honestly | "Better continuity" means nothing without a baseline | The evaluation always runs the same questions with memory off as well |
+| Measuring honestly | "Better continuity" means nothing without a baseline | The evaluation always runs the same questions with memory off as well: 100% with memory vs 10% without |
+| Free-tier limits | Gemini 3.8 Flash allowed 5 requests a minute and 20 a day, and each message uses about 2 | Switched to Gemini 3.5 Flash Lite (15 a minute, 500 a day) and added a `--delay` option to the evaluation |
 
 ---
 
@@ -340,6 +351,7 @@ Model: Gemini 3.8 Flash. Embeddings: all-MiniLM-L6-v2. Personas: 8. Probes: 20.
 **Limitations**
 
 - Conversation threads live in memory and reset when the server restarts (long-term memories don't).
+- The evaluation is small (20 questions, one run).
 - Keyword-based scoring is simple; it can't tell a correct answer from one that mentions the keyword for another reason.
 - Fact extraction costs a second model call per message.
 - Built for one machine: no authentication and a single SQLite file.

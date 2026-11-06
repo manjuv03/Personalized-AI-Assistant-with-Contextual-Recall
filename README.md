@@ -94,7 +94,7 @@ In `.env`, either add an `OPENAI_API_KEY`, or use Gemini with a free key from [G
 
 ```
 LLM_PROVIDER=gemini
-LLM_MODEL=gemini-3.8-flash
+LLM_MODEL=gemini-3.5-flash-lite
 GOOGLE_API_KEY=your-key
 ```
 
@@ -122,6 +122,18 @@ Using a different model is a `.env` change, for example `LLM_PROVIDER=gemini` wi
 | GET | `/users/{user_id}/logs` | Recent turns and average latency |
 
 Interactive docs are at `/docs`.
+
+## Results
+
+Gemini 3.5 Flash Lite, local MiniLM embeddings, 8 personas and 20 questions asked in brand-new conversations ([full results](eval/results.md)):
+
+| | With memory | Without memory |
+|---|---|---|
+| Continuity | **100%** | 10% |
+| Mean response time | 941 ms | 865 ms |
+| p95 response time | 2,278 ms | 1,658 ms |
+
+The memory recall step on its own has a median of 74 ms (mean 150 ms). Small test set, keyword scoring; see [PROJECT_REPORT.md](PROJECT_REPORT.md#12-outcome) for what the numbers do and don't show.
 
 ## Evaluation
 
